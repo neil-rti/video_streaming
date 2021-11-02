@@ -1,0 +1,9 @@
+# example configuration file
+
+near_name = "Near-Station"
+far_name = "Far-Station"
+domain = 0
+topic = "streamData"
+pubsub = "sub"
+reliability  = "best effort"
+data_chunk_size = 18800

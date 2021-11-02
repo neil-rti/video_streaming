@@ -1,0 +1,57 @@
+/* Data type definitions for this example */
+
+module cctypes {
+    // limits on element sizes
+    const uint32 MAX_SEQUENCE_LEN = 18800;  // FIXME: need to test to see what size works best over internet and with apps
+    const uint8 KEY_STRING_LEN = 8;
+
+    // enumeration of the different payload types
+    enum payloadTypesEnum {
+        NO_PAYLOAD = 0,
+        TOP_INFO_EXCHANGE,
+        STREAM_FFMPEG_0,       STREAM_FFMPEG_1,
+        STREAM_GSTREAMER_0,    STREAM_GSTREAMER_1,
+        STREAM_OPENCV_0,       STREAM_OPENCV_1,
+        FILE_TRANSFER_REQUEST, FILE_TRANSFER_ACCEPT, 
+        FILE_TRANSFER_PAYLOAD, FILE_TRANSFER_VERIFY,
+        TEXT_CHAT_0,
+        TEST_PATTERN_0,
+        TRAFFIC_GEN_COMPRESSIBLE,
+        TRAFFIC_GEN_NONCOMPRESSIBLE,
+        IMAGE_FILE,
+        MAX_PAYLOAD_ENUM
+    };
+
+    // this is the bulk datatype sent between users stations (usually over RWT or UDP LAN)
+    struct ccBulk {
+        @key
+        string<KEY_STRING_LEN> destination_id;      // where to send this sample
+        @key
+        cctypes::payloadTypesEnum content_type;     // enum of the content type
+        string<KEY_STRING_LEN> source_id;           // who sent this sample
+        uint64 tstamp_first_frame;                  // timestamp of first 188-byte frame put into data
+        uint8 status;                               // status of transfer
+        sequence<octet, MAX_SEQUENCE_LEN> data;     // payload of data
+    };
+
+    // this type is used to send performance info from the ccBulk subscriber
+    struct ccPerf {
+        @key
+        string<KEY_STRING_LEN> destination_id;      // where to send this sample
+        string<KEY_STRING_LEN> source_id;           // who made the measurements
+        uint64 tStart;                              // start of this measuring period
+        uint64 tEnd;                                // end of this measuring period
+        uint32 samples_count;                       // count of samples this period
+        uint32 samples_dropped;                     // count of dropped samples (total)
+        uint64 latency_min[3];                      //  min latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
+        uint64 latency_mean[3];                     // mean latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
+        uint64 latency_max[3];                      //  max latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
+    };
+
+    // this type is for making changes to the video publisher
+    struct ccControl {
+        @key
+        string<KEY_STRING_LEN> destination_id;      // where to send this sample
+        uint32 frames_per_sample;                   // how many 188-byte video frames per sample
+    };
+};
