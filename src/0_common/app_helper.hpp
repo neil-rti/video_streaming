@@ -51,7 +51,6 @@ namespace application {
     struct ApplicationArguments {
         ParseReturn parse_result;
         unsigned int domain_id;
-        std::string topic_name;
         std::string far_name;
         std::string near_name;
         bool use_reliable;
@@ -62,7 +61,6 @@ namespace application {
         ApplicationArguments(
             ParseReturn parse_result_param,
             unsigned int domain_id_param,
-            std::string topic_name_param,
             std::string far_name_param,
             std::string near_name_param,
             bool use_reliable_param,
@@ -71,7 +69,6 @@ namespace application {
             rti::config::Verbosity verbosity_param)
             : parse_result(parse_result_param),
             domain_id(domain_id_param),
-            topic_name(topic_name_param),
             far_name(far_name_param),
             near_name(near_name_param),
             use_reliable(use_reliable_param),
@@ -85,19 +82,19 @@ namespace application {
         int verbosity_value)
     {
         switch (verbosity_value) {
-            case 0:
+        case 0:
             verbosity = rti::config::Verbosity::SILENT;
             break;
-            case 1:
+        case 1:
             verbosity = rti::config::Verbosity::EXCEPTION;
             break;
-            case 2:
+        case 2:
             verbosity = rti::config::Verbosity::WARNING;
             break;
-            case 3:
+        case 3:
             verbosity = rti::config::Verbosity::STATUS_ALL;
             break;
-            default:
+        default:
             verbosity = rti::config::Verbosity::EXCEPTION;
             break;
         }
@@ -118,7 +115,6 @@ namespace application {
         // arg priority is: 1:cmdLine args, 2:args from config file, 3: defaults
         // 3: init with defaults
         unsigned int domain_id = 0;
-        std::string topic_name = "streamData";
         std::string far_name = "Default Far Name";      // ID name to contact
         std::string near_name = "Default Near Name";    // My ID name
         std::string config_filename = config_filename_default;
@@ -159,9 +155,6 @@ namespace application {
             if(cfgfiledata.contains("domain")) {
                 domain_id = toml::find_or<unsigned int>(cfgfiledata, "domain", 0);
             }
-            if(cfgfiledata.contains("topic")) {
-                topic_name = toml::find_or<std::string>(cfgfiledata, "topic", "cfgfile_type_error");
-            }
             if(cfgfiledata.contains("pubsub")) {
                 std::string pubsub = toml::find_or<std::string>(cfgfiledata, "pubsub", "cfgfile_type_error");
                 std::size_t found = pubsub.find("pub");
@@ -184,11 +177,6 @@ namespace application {
             && (strcmp(argv[arg_processing], "-d") == 0
             || strcmp(argv[arg_processing], "--domain") == 0)) {
                 domain_id = atoi(argv[arg_processing + 1]);
-                arg_processing += 2;
-            } else if ((argc > arg_processing + 1)
-            && (strcmp(argv[arg_processing], "-t") == 0
-            || strcmp(argv[arg_processing], "--topic") == 0)) {
-                topic_name = std::string(argv[arg_processing + 1]);
                 arg_processing += 2;
             } else if ((argc > arg_processing + 1)
             && (strcmp(argv[arg_processing], "-f") == 0
@@ -250,8 +238,6 @@ namespace application {
             std::cout << "Usage:\n"\
             "    -d, --domain      <int>     Domain ID this application will operate in\n" \
             "                                Default: " << domain_id << "\n"\
-            "    -t, --topic       <string>  Topic name for sending data\n" \
-            "                                Default: " << topic_name << "\n"\
             "    -f, --farname     <string>  ID of the station to contact\n" \
             "                                Default: " << far_name << "\n"\
             "    -n, --nearname    <string>  ID of this station\n" \
@@ -278,7 +264,6 @@ namespace application {
             cfgfiledata["near_name"] = near_name;
             cfgfiledata["far_name"] = far_name;
             cfgfiledata["domain"] = domain_id;
-            cfgfiledata["topic"] = topic_name;
             if(pub_else_sub) {
                 cfgfiledata["pubsub"] = "pub";
             }
@@ -298,8 +283,8 @@ namespace application {
         }
 
         return ApplicationArguments(
-            parse_result, domain_id, topic_name, far_name,
-            near_name, use_reliable, pub_else_sub, pub_data_size, verbosity);
+            parse_result, domain_id, far_name, near_name, 
+            use_reliable, pub_else_sub, pub_data_size, verbosity);
  
     }
 

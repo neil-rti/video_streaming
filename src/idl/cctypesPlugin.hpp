@@ -10,8 +10,8 @@ For more information, type 'rtiddsgen -help' at a command shell
 or consult the Code Generator User's Manual.
 */
 
-#ifndef cctypesPlugin_751230461_h
-#define cctypesPlugin_751230461_h
+#ifndef cctypesPlugin_751230475_h
+#define cctypesPlugin_751230475_h
 
 #include "cctypes.hpp"
 
@@ -702,5 +702,5 @@ namespace cctypes {
 #define NDDSUSERDllExport
 #endif
 
-#endif /* cctypesPlugin_751230461_h */
+#endif /* cctypesPlugin_751230475_h */
 

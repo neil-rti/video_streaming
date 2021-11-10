@@ -608,7 +608,6 @@ namespace cctypes {
         try {
             if (endpoint_data) {} /* To avoid warnings */   
 
-            dst->destination_id() = src->destination_id();
             dst->content_type() = src->content_type();
             return RTI_TRUE;
         } catch (...) {
@@ -624,7 +623,6 @@ namespace cctypes {
     {
         try {
             if (endpoint_data) {} /* To avoid warnings */   
-            dst->destination_id() = src->destination_id();
             dst->content_type() = src->content_type();
             return RTI_TRUE;
         } catch (...) {
@@ -1287,7 +1285,7 @@ namespace cctypes {
         try {
             if (endpoint_data) {} /* To avoid warnings */   
 
-            dst->destination_id() = src->destination_id();
+            dst->tStart() = src->tStart();
             return RTI_TRUE;
         } catch (...) {
             return RTI_FALSE;
@@ -1302,7 +1300,7 @@ namespace cctypes {
     {
         try {
             if (endpoint_data) {} /* To avoid warnings */   
-            dst->destination_id() = src->destination_id();
+            dst->tStart() = src->tStart();
             return RTI_TRUE;
         } catch (...) {
             return RTI_FALSE;
@@ -1964,7 +1962,7 @@ namespace cctypes {
         try {
             if (endpoint_data) {} /* To avoid warnings */   
 
-            dst->destination_id() = src->destination_id();
+            dst->content_type() = src->content_type();
             return RTI_TRUE;
         } catch (...) {
             return RTI_FALSE;
@@ -1979,7 +1977,7 @@ namespace cctypes {
     {
         try {
             if (endpoint_data) {} /* To avoid warnings */   
-            dst->destination_id() = src->destination_id();
+            dst->content_type() = src->content_type();
             return RTI_TRUE;
         } catch (...) {
             return RTI_FALSE;

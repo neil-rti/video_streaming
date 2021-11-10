@@ -26,9 +26,18 @@ set(SOURCES_TYPSUPT
 )
 
 # - Executables to build ----------------------------------------------------------------------------
+# vsffmpeg_ext : video streaming with FFMPEG (external)
 add_executable(vsffmpeg_ext 
   src/1_ffmpeg_ext/ffmpeg_stdio.cxx
   src/0_common/rti_comms.cxx
   src/0_common/murmurhash3.cpp
   ${SOURCES_TYPSUPT})
 target_link_libraries(vsffmpeg_ext PUBLIC RTIConnextDDS::cpp2_api)
+
+# vstream_mon : performance monitoring of video streaming example
+add_executable(vstream_mon 
+  src/1_ffmpeg_ext/vstream_mon.cxx
+  src/0_common/rti_comms.cxx
+  src/0_common/murmurhash3.cpp
+  ${SOURCES_TYPSUPT})
+target_link_libraries(vstream_mon PUBLIC RTIConnextDDS::cpp2_api)

@@ -56,8 +56,7 @@ public:
     void datarcv_waitset(int32_t secs, uint32_t nsecs) { waitset->dispatch(dds::core::Duration(secs, nsecs)); }
 
     // pub sample element setters
-    void pub_sample_destination_id_set(std::string id) {pub_sample.destination_id(id); }
-    void pub_sample_source_id_set(std::string id) {pub_sample.source_id(id); }
+    void pub_sample_pub_id_set(std::string id) {pub_sample.pub_id(id); }
     void pub_sample_content_type_set(cctypes::payloadTypesEnum pType) {pub_sample.content_type(pType); }
     uint8_t *pub_sample_data(void) { return pub_sample.data().data(); }
     void pub_sample_data_size_set(int32_t newSize) { pub_sample.data().resize(newSize); }
@@ -110,27 +109,16 @@ public:
     void datarcv_waitset(int32_t secs, uint32_t nsecs) { waitset->dispatch(dds::core::Duration(secs, nsecs)); }
 
     // pub sample element setters
-    void pub_sample_source_id_set(std::string id) {pub_sample.source_id(id); }
-    void pub_sample_destination_id_set(std::string id) {pub_sample.destination_id(id); }
-    void pub_sample_latency_min_set(uint64_t latMin[3]) { 
-        for(int i=0 ; i<3 ; i++) {
-            pub_sample.latency_min().at(i) = latMin[i];
-        }
-    }
-    void pub_sample_latency_max_set(uint64_t latMax[3]) { 
-        for(int i=0 ; i<3 ; i++) {
-            pub_sample.latency_max().at(i) = latMax[i];
-        }
-    }
-    void pub_sample_latency_mean_set(uint64_t latMean[3]) { 
-        for(int i=0 ; i<3 ; i++) {
-            pub_sample.latency_mean().at(i) = latMean[i];
-        }
-    }
+    void pub_sample_latency_min_set(std::vector<int64_t> latMin) { pub_sample.latency_min() = latMin; }
+    void pub_sample_latency_mean_set(std::vector<int64_t> latMean) { pub_sample.latency_mean() = latMean; }
+    void pub_sample_latency_max_set(std::vector<int64_t> latMax) { pub_sample.latency_max() = latMax; }
+    void pub_sample_latency_stddev_set(std::vector<uint64_t> stddev) { pub_sample.latency_stddev() = stddev; }
     void pub_sample_drop_samples_set(uint32_t drops) { pub_sample.samples_dropped(drops); }
+    void pub_sample_frames_per_sample_set(uint32_t count) { pub_sample.frames_per_sample(count); }
     void pub_sample_count_samples_set(uint32_t count) { pub_sample.samples_count(count); }
+    void pub_sample_count_data_set(uint64_t datacount) { pub_sample.data_count(datacount); }
     void pub_sample_tstart_set(uint64_t tStart) { pub_sample.tStart(tStart); }
-    void pub_sample_tend_set(uint64_t tEnd) { pub_sample.tEnd(tEnd); }
+    void pub_sample_tduration_set(uint64_t tDuration) { pub_sample.tDuration(tDuration); }
 
     // sub sample
     cctypes::ccPerf pop_sub_sample(void) { 
@@ -158,5 +146,50 @@ private:
     int32_t data_rcv_count;
 };
 
+
+// Class for controlling streaming comms publisher
+class rtiComPubCtrl
+{
+public:
+    rtiComPubCtrl(
+        const std::string topicName, uint32_t opt_en, 
+        dds::domain::DomainParticipant participant,
+        dds::core::cond::WaitSet *waitset_ext = NULL,
+        int(*rcv_fptr)(dds::sub::DataReader<cctypes::ccControl>) = NULL);
+    ~rtiComPubCtrl();
+
+    cctypes::ccControl *get_pub_sample(void) { return &pub_sample; }
+    void publish(void);
+    void publish(cctypes::ccControl sample);
+    void datarcv_waitset(int32_t secs, uint32_t nsecs) { waitset->dispatch(dds::core::Duration(secs, nsecs)); }
+
+    // pub sample element setters
+    void pub_sample_frames_per_sample_set(uint32_t fps) { pub_sample.frames_per_sample(fps);  }
+
+    // sub sample
+    cctypes::ccControl pop_sub_sample(void) { 
+        cctypes::ccControl oldestSample = sub_samples.front();
+        sub_samples.pop();
+        return oldestSample;
+    }
+    cctypes::ccControl oldest_sub_sample(void) { return sub_samples.front(); }
+    uint32_t sub_samples_in_queue(void) { return sub_samples.size(); }
+    void pop_oldest_sub_sample(void) { sub_samples.pop(); }
+
+private:
+    // DDS Topic, DataWriter, DataReader, read data handler, sample
+    dds::topic::Topic<cctypes::ccControl> data_topic;
+    dds::pub::DataWriter<cctypes::ccControl> data_wr;
+    dds::sub::DataReader<cctypes::ccControl> data_rd;
+    int rcv_dataProc(dds::sub::DataReader<cctypes::ccControl> & reader);
+    cctypes::ccControl pub_sample;
+    cctypes::ccControl sub_sample;
+    std::queue<cctypes::ccControl> sub_samples;
+
+    // misc
+    dds::core::cond::WaitSet waitset_int;       // internal waitset (if no external provided)
+    dds::core::cond::WaitSet *waitset;
+    int32_t data_rcv_count;
+};
 
 #endif      // ndef __RTI_COMMS_HPP__

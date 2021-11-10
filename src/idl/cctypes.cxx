@@ -87,40 +87,30 @@ namespace cctypes {
     // ---- ccBulk: 
 
     ccBulk::ccBulk() :
-        m_destination_id_ ("") ,
         m_content_type_(cctypes::payloadTypesEnum::NO_PAYLOAD) ,
-        m_source_id_ ("") ,
-        m_tstamp_first_frame_ (0ull) ,
-        m_status_ (0)  {
+        m_pub_id_ ("") ,
+        m_tstamp_first_frame_ (0ull)  {
     }   
 
     ccBulk::ccBulk (
-        const std::string& destination_id,
         const cctypes::payloadTypesEnum& content_type,
-        const std::string& source_id,
+        const std::string& pub_id,
         uint64_t tstamp_first_frame,
-        uint8_t status,
         const ::rti::core::bounded_sequence< uint8_t, (cctypes::MAX_SEQUENCE_LEN) >& data)
         :
-            m_destination_id_( destination_id ),
             m_content_type_( content_type ),
-            m_source_id_( source_id ),
+            m_pub_id_( pub_id ),
             m_tstamp_first_frame_( tstamp_first_frame ),
-            m_status_( status ),
             m_data_( data ) {
     }
 
     #ifdef RTI_CXX11_RVALUE_REFERENCES
     #ifdef RTI_CXX11_NO_IMPLICIT_MOVE_OPERATIONS
-    ccBulk::ccBulk(ccBulk&& other_) OMG_NOEXCEPT  :m_destination_id_ (std::move(other_.m_destination_id_))
+    ccBulk::ccBulk(ccBulk&& other_) OMG_NOEXCEPT  :m_content_type_ (std::move(other_.m_content_type_))
     ,
-    m_content_type_ (std::move(other_.m_content_type_))
-    ,
-    m_source_id_ (std::move(other_.m_source_id_))
+    m_pub_id_ (std::move(other_.m_pub_id_))
     ,
     m_tstamp_first_frame_ (std::move(other_.m_tstamp_first_frame_))
-    ,
-    m_status_ (std::move(other_.m_status_))
     ,
     m_data_ (std::move(other_.m_data_))
     {
@@ -137,28 +127,20 @@ namespace cctypes {
     void ccBulk::swap(ccBulk& other_)  OMG_NOEXCEPT 
     {
         using std::swap;
-        swap(m_destination_id_, other_.m_destination_id_);
         swap(m_content_type_, other_.m_content_type_);
-        swap(m_source_id_, other_.m_source_id_);
+        swap(m_pub_id_, other_.m_pub_id_);
         swap(m_tstamp_first_frame_, other_.m_tstamp_first_frame_);
-        swap(m_status_, other_.m_status_);
         swap(m_data_, other_.m_data_);
     }  
 
     bool ccBulk::operator == (const ccBulk& other_) const {
-        if (m_destination_id_ != other_.m_destination_id_) {
-            return false;
-        }
         if (m_content_type_ != other_.m_content_type_) {
             return false;
         }
-        if (m_source_id_ != other_.m_source_id_) {
+        if (m_pub_id_ != other_.m_pub_id_) {
             return false;
         }
         if (m_tstamp_first_frame_ != other_.m_tstamp_first_frame_) {
-            return false;
-        }
-        if (m_status_ != other_.m_status_) {
             return false;
         }
         if (m_data_ != other_.m_data_) {
@@ -174,11 +156,9 @@ namespace cctypes {
     {
         ::rti::util::StreamFlagSaver flag_saver (o);
         o <<"[";
-        o << "destination_id: " << sample.destination_id()<<", ";
         o << "content_type: " << sample.content_type()<<", ";
-        o << "source_id: " << sample.source_id()<<", ";
+        o << "pub_id: " << sample.pub_id()<<", ";
         o << "tstamp_first_frame: " << sample.tstamp_first_frame()<<", ";
-        o << "status: " << (int)sample.status() <<", ";
         o << "data: " << sample.data() ;
         o <<"]";
         return o;
@@ -187,48 +167,47 @@ namespace cctypes {
     // ---- ccPerf: 
 
     ccPerf::ccPerf() :
-        m_destination_id_ ("") ,
-        m_source_id_ ("") ,
         m_tStart_ (0ull) ,
-        m_tEnd_ (0ull) ,
+        m_tDuration_ (0ull) ,
+        m_data_count_ (0ull) ,
+        m_frames_per_sample_ (0u) ,
         m_samples_count_ (0u) ,
         m_samples_dropped_ (0u)  {
-            ::rti::core::fill_array< uint64_t >( m_latency_min_, 0);
-            ::rti::core::fill_array< uint64_t >( m_latency_mean_, 0);
-            ::rti::core::fill_array< uint64_t >( m_latency_max_, 0);
     }   
 
     ccPerf::ccPerf (
-        const std::string& destination_id,
-        const std::string& source_id,
         uint64_t tStart,
-        uint64_t tEnd,
+        uint64_t tDuration,
+        uint64_t data_count,
+        uint32_t frames_per_sample,
         uint32_t samples_count,
         uint32_t samples_dropped,
-        const ::dds::core::array< uint64_t, 3L>& latency_min,
-        const ::dds::core::array< uint64_t, 3L>& latency_mean,
-        const ::dds::core::array< uint64_t, 3L>& latency_max)
+        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_min,
+        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_mean,
+        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_max,
+        const ::rti::core::bounded_sequence< uint64_t, 4L >& latency_stddev)
         :
-            m_destination_id_( destination_id ),
-            m_source_id_( source_id ),
             m_tStart_( tStart ),
-            m_tEnd_( tEnd ),
+            m_tDuration_( tDuration ),
+            m_data_count_( data_count ),
+            m_frames_per_sample_( frames_per_sample ),
             m_samples_count_( samples_count ),
             m_samples_dropped_( samples_dropped ),
             m_latency_min_( latency_min ),
             m_latency_mean_( latency_mean ),
-            m_latency_max_( latency_max ) {
+            m_latency_max_( latency_max ),
+            m_latency_stddev_( latency_stddev ) {
     }
 
     #ifdef RTI_CXX11_RVALUE_REFERENCES
     #ifdef RTI_CXX11_NO_IMPLICIT_MOVE_OPERATIONS
-    ccPerf::ccPerf(ccPerf&& other_) OMG_NOEXCEPT  :m_destination_id_ (std::move(other_.m_destination_id_))
+    ccPerf::ccPerf(ccPerf&& other_) OMG_NOEXCEPT  :m_tStart_ (std::move(other_.m_tStart_))
     ,
-    m_source_id_ (std::move(other_.m_source_id_))
+    m_tDuration_ (std::move(other_.m_tDuration_))
     ,
-    m_tStart_ (std::move(other_.m_tStart_))
+    m_data_count_ (std::move(other_.m_data_count_))
     ,
-    m_tEnd_ (std::move(other_.m_tEnd_))
+    m_frames_per_sample_ (std::move(other_.m_frames_per_sample_))
     ,
     m_samples_count_ (std::move(other_.m_samples_count_))
     ,
@@ -239,6 +218,8 @@ namespace cctypes {
     m_latency_mean_ (std::move(other_.m_latency_mean_))
     ,
     m_latency_max_ (std::move(other_.m_latency_max_))
+    ,
+    m_latency_stddev_ (std::move(other_.m_latency_stddev_))
     {
     } 
 
@@ -253,28 +234,29 @@ namespace cctypes {
     void ccPerf::swap(ccPerf& other_)  OMG_NOEXCEPT 
     {
         using std::swap;
-        swap(m_destination_id_, other_.m_destination_id_);
-        swap(m_source_id_, other_.m_source_id_);
         swap(m_tStart_, other_.m_tStart_);
-        swap(m_tEnd_, other_.m_tEnd_);
+        swap(m_tDuration_, other_.m_tDuration_);
+        swap(m_data_count_, other_.m_data_count_);
+        swap(m_frames_per_sample_, other_.m_frames_per_sample_);
         swap(m_samples_count_, other_.m_samples_count_);
         swap(m_samples_dropped_, other_.m_samples_dropped_);
         swap(m_latency_min_, other_.m_latency_min_);
         swap(m_latency_mean_, other_.m_latency_mean_);
         swap(m_latency_max_, other_.m_latency_max_);
+        swap(m_latency_stddev_, other_.m_latency_stddev_);
     }  
 
     bool ccPerf::operator == (const ccPerf& other_) const {
-        if (m_destination_id_ != other_.m_destination_id_) {
-            return false;
-        }
-        if (m_source_id_ != other_.m_source_id_) {
-            return false;
-        }
         if (m_tStart_ != other_.m_tStart_) {
             return false;
         }
-        if (m_tEnd_ != other_.m_tEnd_) {
+        if (m_tDuration_ != other_.m_tDuration_) {
+            return false;
+        }
+        if (m_data_count_ != other_.m_data_count_) {
+            return false;
+        }
+        if (m_frames_per_sample_ != other_.m_frames_per_sample_) {
             return false;
         }
         if (m_samples_count_ != other_.m_samples_count_) {
@@ -292,6 +274,9 @@ namespace cctypes {
         if (m_latency_max_ != other_.m_latency_max_) {
             return false;
         }
+        if (m_latency_stddev_ != other_.m_latency_stddev_) {
+            return false;
+        }
         return true;
     }
     bool ccPerf::operator != (const ccPerf& other_) const {
@@ -302,15 +287,16 @@ namespace cctypes {
     {
         ::rti::util::StreamFlagSaver flag_saver (o);
         o <<"[";
-        o << "destination_id: " << sample.destination_id()<<", ";
-        o << "source_id: " << sample.source_id()<<", ";
         o << "tStart: " << sample.tStart()<<", ";
-        o << "tEnd: " << sample.tEnd()<<", ";
+        o << "tDuration: " << sample.tDuration()<<", ";
+        o << "data_count: " << sample.data_count()<<", ";
+        o << "frames_per_sample: " << sample.frames_per_sample()<<", ";
         o << "samples_count: " << sample.samples_count()<<", ";
         o << "samples_dropped: " << sample.samples_dropped()<<", ";
         o << "latency_min: " << sample.latency_min()<<", ";
         o << "latency_mean: " << sample.latency_mean()<<", ";
-        o << "latency_max: " << sample.latency_max() ;
+        o << "latency_max: " << sample.latency_max()<<", ";
+        o << "latency_stddev: " << sample.latency_stddev() ;
         o <<"]";
         return o;
     }
@@ -318,21 +304,21 @@ namespace cctypes {
     // ---- ccControl: 
 
     ccControl::ccControl() :
-        m_destination_id_ ("") ,
+        m_content_type_(cctypes::payloadTypesEnum::NO_PAYLOAD) ,
         m_frames_per_sample_ (0u)  {
     }   
 
     ccControl::ccControl (
-        const std::string& destination_id,
+        const cctypes::payloadTypesEnum& content_type,
         uint32_t frames_per_sample)
         :
-            m_destination_id_( destination_id ),
+            m_content_type_( content_type ),
             m_frames_per_sample_( frames_per_sample ) {
     }
 
     #ifdef RTI_CXX11_RVALUE_REFERENCES
     #ifdef RTI_CXX11_NO_IMPLICIT_MOVE_OPERATIONS
-    ccControl::ccControl(ccControl&& other_) OMG_NOEXCEPT  :m_destination_id_ (std::move(other_.m_destination_id_))
+    ccControl::ccControl(ccControl&& other_) OMG_NOEXCEPT  :m_content_type_ (std::move(other_.m_content_type_))
     ,
     m_frames_per_sample_ (std::move(other_.m_frames_per_sample_))
     {
@@ -349,12 +335,12 @@ namespace cctypes {
     void ccControl::swap(ccControl& other_)  OMG_NOEXCEPT 
     {
         using std::swap;
-        swap(m_destination_id_, other_.m_destination_id_);
+        swap(m_content_type_, other_.m_content_type_);
         swap(m_frames_per_sample_, other_.m_frames_per_sample_);
     }  
 
     bool ccControl::operator == (const ccControl& other_) const {
-        if (m_destination_id_ != other_.m_destination_id_) {
+        if (m_content_type_ != other_.m_content_type_) {
             return false;
         }
         if (m_frames_per_sample_ != other_.m_frames_per_sample_) {
@@ -370,7 +356,7 @@ namespace cctypes {
     {
         ::rti::util::StreamFlagSaver flag_saver (o);
         o <<"[";
-        o << "destination_id: " << sample.destination_id()<<", ";
+        o << "content_type: " << sample.content_type()<<", ";
         o << "frames_per_sample: " << sample.frames_per_sample() ;
         o <<"]";
         return o;
@@ -862,15 +848,14 @@ namespace rti {
 
                 static RTIBool is_initialized = RTI_FALSE;
 
-                static DDS_TypeCode ccBulk_g_tc_destination_id_string;
-                static DDS_TypeCode ccBulk_g_tc_source_id_string;
+                static DDS_TypeCode ccBulk_g_tc_pub_id_string;
                 static DDS_TypeCode ccBulk_g_tc_data_sequence;
 
-                static DDS_TypeCode_Member ccBulk_g_tc_members[6]=
+                static DDS_TypeCode_Member ccBulk_g_tc_members[4]=
                 {
 
                     {
-                        (char *)"destination_id",/* Member name */
+                        (char *)"content_type",/* Member name */
                         {
                             0,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
@@ -888,27 +873,9 @@ namespace rti {
                         RTICdrTypeCodeAnnotations_INITIALIZER
                     }, 
                     {
-                        (char *)"content_type",/* Member name */
+                        (char *)"pub_id",/* Member name */
                         {
                             1,/* Representation ID */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_KEY_MEMBER , /* Is a key? */
-                        DDS_PUBLIC_MEMBER,/* Member visibility */
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"source_id",/* Member name */
-                        {
-                            2,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
                             -1, /* Bitfield bits */
                             NULL/* Member type code is assigned later */
@@ -926,25 +893,7 @@ namespace rti {
                     {
                         (char *)"tstamp_first_frame",/* Member name */
                         {
-                            3,/* Representation ID */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PUBLIC_MEMBER,/* Member visibility */
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"status",/* Member name */
-                        {
-                            4,/* Representation ID */
+                            2,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
                             -1, /* Bitfield bits */
                             NULL/* Member type code is assigned later */
@@ -962,7 +911,7 @@ namespace rti {
                     {
                         (char *)"data",/* Member name */
                         {
-                            5,/* Representation ID */
+                            3,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
                             -1, /* Bitfield bits */
                             NULL/* Member type code is assigned later */
@@ -989,7 +938,7 @@ namespace rti {
                         0, /* Ignored */
                         0, /* Ignored */
                         NULL, /* Ignored */
-                        6, /* Number of members */
+                        4, /* Number of members */
                         ccBulk_g_tc_members, /* Members */
                         DDS_VM_NONE, /* Ignored */
                         RTICdrTypeCodeAnnotations_INITIALIZER,
@@ -1002,43 +951,30 @@ namespace rti {
                     return &ccBulk_g_tc;
                 }
 
-                ccBulk_g_tc_destination_id_string = initialize_string_typecode(((cctypes::KEY_STRING_LEN)));
-                ccBulk_g_tc_source_id_string = initialize_string_typecode(((cctypes::KEY_STRING_LEN)));
+                ccBulk_g_tc_pub_id_string = initialize_string_typecode(((cctypes::KEY_STRING_LEN)));
                 ccBulk_g_tc_data_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< uint8_t, (cctypes::MAX_SEQUENCE_LEN) > >(((cctypes::MAX_SEQUENCE_LEN)));
 
                 ccBulk_g_tc._data._annotations._allowedDataRepresentationMask = 5;
 
                 ccBulk_g_tc_data_sequence._data._typeCode = (RTICdrTypeCode *)&DDS_g_tc_octet;
-                ccBulk_g_tc_members[0]._representation._typeCode = (RTICdrTypeCode *)&ccBulk_g_tc_destination_id_string;
-                ccBulk_g_tc_members[1]._representation._typeCode = (RTICdrTypeCode *)&::rti::topic::dynamic_type< cctypes::payloadTypesEnum>::get().native();
-                ccBulk_g_tc_members[2]._representation._typeCode = (RTICdrTypeCode *)&ccBulk_g_tc_source_id_string;
-                ccBulk_g_tc_members[3]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
-                ccBulk_g_tc_members[4]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_octet;
-                ccBulk_g_tc_members[5]._representation._typeCode = (RTICdrTypeCode *)& ccBulk_g_tc_data_sequence;
+                ccBulk_g_tc_members[0]._representation._typeCode = (RTICdrTypeCode *)&::rti::topic::dynamic_type< cctypes::payloadTypesEnum>::get().native();
+                ccBulk_g_tc_members[1]._representation._typeCode = (RTICdrTypeCode *)&ccBulk_g_tc_pub_id_string;
+                ccBulk_g_tc_members[2]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
+                ccBulk_g_tc_members[3]._representation._typeCode = (RTICdrTypeCode *)& ccBulk_g_tc_data_sequence;
 
                 /* Initialize the values for member annotations. */
-                ccBulk_g_tc_members[0]._annotations._defaultValue._d = RTI_XCDR_TK_STRING;
-                ccBulk_g_tc_members[0]._annotations._defaultValue._u.string_value = (DDS_Char *) "";
+                ccBulk_g_tc_members[0]._annotations._defaultValue._d = RTI_XCDR_TK_ENUM;
+                ccBulk_g_tc_members[0]._annotations._defaultValue._u.enumerated_value = 0;
 
-                ccBulk_g_tc_members[1]._annotations._defaultValue._d = RTI_XCDR_TK_ENUM;
-                ccBulk_g_tc_members[1]._annotations._defaultValue._u.enumerated_value = 0;
+                ccBulk_g_tc_members[1]._annotations._defaultValue._d = RTI_XCDR_TK_STRING;
+                ccBulk_g_tc_members[1]._annotations._defaultValue._u.string_value = (DDS_Char *) "";
 
-                ccBulk_g_tc_members[2]._annotations._defaultValue._d = RTI_XCDR_TK_STRING;
-                ccBulk_g_tc_members[2]._annotations._defaultValue._u.string_value = (DDS_Char *) "";
-
-                ccBulk_g_tc_members[3]._annotations._defaultValue._d = RTI_XCDR_TK_ULONGLONG;
-                ccBulk_g_tc_members[3]._annotations._defaultValue._u.ulong_long_value = 0ull;
-                ccBulk_g_tc_members[3]._annotations._minValue._d = RTI_XCDR_TK_ULONGLONG;
-                ccBulk_g_tc_members[3]._annotations._minValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MIN;
-                ccBulk_g_tc_members[3]._annotations._maxValue._d = RTI_XCDR_TK_ULONGLONG;
-                ccBulk_g_tc_members[3]._annotations._maxValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MAX;
-
-                ccBulk_g_tc_members[4]._annotations._defaultValue._d = RTI_XCDR_TK_OCTET;
-                ccBulk_g_tc_members[4]._annotations._defaultValue._u.octet_value = 0;
-                ccBulk_g_tc_members[4]._annotations._minValue._d = RTI_XCDR_TK_OCTET;
-                ccBulk_g_tc_members[4]._annotations._minValue._u.octet_value = RTIXCdrOctet_MIN;
-                ccBulk_g_tc_members[4]._annotations._maxValue._d = RTI_XCDR_TK_OCTET;
-                ccBulk_g_tc_members[4]._annotations._maxValue._u.octet_value = RTIXCdrOctet_MAX;
+                ccBulk_g_tc_members[2]._annotations._defaultValue._d = RTI_XCDR_TK_ULONGLONG;
+                ccBulk_g_tc_members[2]._annotations._defaultValue._u.ulong_long_value = 0ull;
+                ccBulk_g_tc_members[2]._annotations._minValue._d = RTI_XCDR_TK_ULONGLONG;
+                ccBulk_g_tc_members[2]._annotations._minValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MIN;
+                ccBulk_g_tc_members[2]._annotations._maxValue._d = RTI_XCDR_TK_ULONGLONG;
+                ccBulk_g_tc_members[2]._annotations._maxValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MAX;
 
                 ccBulk_g_tc._data._sampleAccessInfo = sample_access_info();
                 ccBulk_g_tc._data._typePlugin = type_plugin_info();    
@@ -1054,7 +990,7 @@ namespace rti {
 
                 cctypes::ccBulk *sample;
 
-                static RTIXCdrMemberAccessInfo ccBulk_g_memberAccessInfos[6] =
+                static RTIXCdrMemberAccessInfo ccBulk_g_memberAccessInfos[4] =
                 {RTIXCdrMemberAccessInfo_INITIALIZER};
 
                 static RTIXCdrSampleAccessInfo ccBulk_g_sampleAccessInfo = 
@@ -1072,21 +1008,15 @@ namespace rti {
                 }
 
                 ccBulk_g_memberAccessInfos[0].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->destination_id() - (char *)sample);
-
-                ccBulk_g_memberAccessInfos[1].bindingMemberValueOffset[0] = 
                 (RTIXCdrUnsignedLong) ((char *)&sample->content_type() - (char *)sample);
 
-                ccBulk_g_memberAccessInfos[2].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->source_id() - (char *)sample);
+                ccBulk_g_memberAccessInfos[1].bindingMemberValueOffset[0] = 
+                (RTIXCdrUnsignedLong) ((char *)&sample->pub_id() - (char *)sample);
 
-                ccBulk_g_memberAccessInfos[3].bindingMemberValueOffset[0] = 
+                ccBulk_g_memberAccessInfos[2].bindingMemberValueOffset[0] = 
                 (RTIXCdrUnsignedLong) ((char *)&sample->tstamp_first_frame() - (char *)sample);
 
-                ccBulk_g_memberAccessInfos[4].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->status() - (char *)sample);
-
-                ccBulk_g_memberAccessInfos[5].bindingMemberValueOffset[0] = 
+                ccBulk_g_memberAccessInfos[3].bindingMemberValueOffset[0] = 
                 (RTIXCdrUnsignedLong) ((char *)&sample->data() - (char *)sample);
 
                 ccBulk_g_sampleAccessInfo.memberAccessInfos = 
@@ -1159,17 +1089,16 @@ namespace rti {
 
                 static RTIBool is_initialized = RTI_FALSE;
 
-                static DDS_TypeCode ccPerf_g_tc_destination_id_string;
-                static DDS_TypeCode ccPerf_g_tc_source_id_string;
-                static DDS_TypeCode ccPerf_g_tc_latency_min_array =DDS_INITIALIZE_ARRAY_TYPECODE(1,3L, NULL,NULL);
-                static DDS_TypeCode ccPerf_g_tc_latency_mean_array =DDS_INITIALIZE_ARRAY_TYPECODE(1,3L, NULL,NULL);
-                static DDS_TypeCode ccPerf_g_tc_latency_max_array =DDS_INITIALIZE_ARRAY_TYPECODE(1,3L, NULL,NULL);
+                static DDS_TypeCode ccPerf_g_tc_latency_min_sequence;
+                static DDS_TypeCode ccPerf_g_tc_latency_mean_sequence;
+                static DDS_TypeCode ccPerf_g_tc_latency_max_sequence;
+                static DDS_TypeCode ccPerf_g_tc_latency_stddev_sequence;
 
-                static DDS_TypeCode_Member ccPerf_g_tc_members[9]=
+                static DDS_TypeCode_Member ccPerf_g_tc_members[10]=
                 {
 
                     {
-                        (char *)"destination_id",/* Member name */
+                        (char *)"tStart",/* Member name */
                         {
                             0,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
@@ -1187,7 +1116,7 @@ namespace rti {
                         RTICdrTypeCodeAnnotations_INITIALIZER
                     }, 
                     {
-                        (char *)"source_id",/* Member name */
+                        (char *)"tDuration",/* Member name */
                         {
                             1,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
@@ -1205,7 +1134,7 @@ namespace rti {
                         RTICdrTypeCodeAnnotations_INITIALIZER
                     }, 
                     {
-                        (char *)"tStart",/* Member name */
+                        (char *)"data_count",/* Member name */
                         {
                             2,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
@@ -1223,7 +1152,7 @@ namespace rti {
                         RTICdrTypeCodeAnnotations_INITIALIZER
                     }, 
                     {
-                        (char *)"tEnd",/* Member name */
+                        (char *)"frames_per_sample",/* Member name */
                         {
                             3,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
@@ -1329,6 +1258,24 @@ namespace rti {
                         1,
                         NULL, /* Ignored */
                         RTICdrTypeCodeAnnotations_INITIALIZER
+                    }, 
+                    {
+                        (char *)"latency_stddev",/* Member name */
+                        {
+                            9,/* Representation ID */
+                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
+                            -1, /* Bitfield bits */
+                            NULL/* Member type code is assigned later */
+                        },
+                        0, /* Ignored */
+                        0, /* Ignored */
+                        0, /* Ignored */
+                        NULL, /* Ignored */
+                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
+                        DDS_PUBLIC_MEMBER,/* Member visibility */
+                        1,
+                        NULL, /* Ignored */
+                        RTICdrTypeCodeAnnotations_INITIALIZER
                     }
                 };
 
@@ -1342,7 +1289,7 @@ namespace rti {
                         0, /* Ignored */
                         0, /* Ignored */
                         NULL, /* Ignored */
-                        9, /* Number of members */
+                        10, /* Number of members */
                         ccPerf_g_tc_members, /* Members */
                         DDS_VM_NONE, /* Ignored */
                         RTICdrTypeCodeAnnotations_INITIALIZER,
@@ -1355,30 +1302,42 @@ namespace rti {
                     return &ccPerf_g_tc;
                 }
 
-                ccPerf_g_tc_destination_id_string = initialize_string_typecode(((cctypes::KEY_STRING_LEN)));
-                ccPerf_g_tc_source_id_string = initialize_string_typecode(((cctypes::KEY_STRING_LEN)));
+                ccPerf_g_tc_latency_min_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< int64_t, 4L > >((4L));
+                ccPerf_g_tc_latency_mean_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< int64_t, 4L > >((4L));
+                ccPerf_g_tc_latency_max_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< int64_t, 4L > >((4L));
+                ccPerf_g_tc_latency_stddev_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< uint64_t, 4L > >((4L));
 
                 ccPerf_g_tc._data._annotations._allowedDataRepresentationMask = 5;
 
-                ccPerf_g_tc_latency_min_array._data._typeCode =(RTICdrTypeCode *)&DDS_g_tc_ulonglong;
-                ccPerf_g_tc_latency_mean_array._data._typeCode =(RTICdrTypeCode *)&DDS_g_tc_ulonglong;
-                ccPerf_g_tc_latency_max_array._data._typeCode =(RTICdrTypeCode *)&DDS_g_tc_ulonglong;
-                ccPerf_g_tc_members[0]._representation._typeCode = (RTICdrTypeCode *)&ccPerf_g_tc_destination_id_string;
-                ccPerf_g_tc_members[1]._representation._typeCode = (RTICdrTypeCode *)&ccPerf_g_tc_source_id_string;
+                ccPerf_g_tc_latency_min_sequence._data._typeCode = (RTICdrTypeCode *)&DDS_g_tc_longlong;
+                ccPerf_g_tc_latency_mean_sequence._data._typeCode = (RTICdrTypeCode *)&DDS_g_tc_longlong;
+                ccPerf_g_tc_latency_max_sequence._data._typeCode = (RTICdrTypeCode *)&DDS_g_tc_longlong;
+                ccPerf_g_tc_latency_stddev_sequence._data._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
+                ccPerf_g_tc_members[0]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
+                ccPerf_g_tc_members[1]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
                 ccPerf_g_tc_members[2]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
-                ccPerf_g_tc_members[3]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
+                ccPerf_g_tc_members[3]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulong;
                 ccPerf_g_tc_members[4]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulong;
                 ccPerf_g_tc_members[5]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulong;
-                ccPerf_g_tc_members[6]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_latency_min_array;
-                ccPerf_g_tc_members[7]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_latency_mean_array;
-                ccPerf_g_tc_members[8]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_latency_max_array;
+                ccPerf_g_tc_members[6]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_latency_min_sequence;
+                ccPerf_g_tc_members[7]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_latency_mean_sequence;
+                ccPerf_g_tc_members[8]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_latency_max_sequence;
+                ccPerf_g_tc_members[9]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_latency_stddev_sequence;
 
                 /* Initialize the values for member annotations. */
-                ccPerf_g_tc_members[0]._annotations._defaultValue._d = RTI_XCDR_TK_STRING;
-                ccPerf_g_tc_members[0]._annotations._defaultValue._u.string_value = (DDS_Char *) "";
+                ccPerf_g_tc_members[0]._annotations._defaultValue._d = RTI_XCDR_TK_ULONGLONG;
+                ccPerf_g_tc_members[0]._annotations._defaultValue._u.ulong_long_value = 0ull;
+                ccPerf_g_tc_members[0]._annotations._minValue._d = RTI_XCDR_TK_ULONGLONG;
+                ccPerf_g_tc_members[0]._annotations._minValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MIN;
+                ccPerf_g_tc_members[0]._annotations._maxValue._d = RTI_XCDR_TK_ULONGLONG;
+                ccPerf_g_tc_members[0]._annotations._maxValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MAX;
 
-                ccPerf_g_tc_members[1]._annotations._defaultValue._d = RTI_XCDR_TK_STRING;
-                ccPerf_g_tc_members[1]._annotations._defaultValue._u.string_value = (DDS_Char *) "";
+                ccPerf_g_tc_members[1]._annotations._defaultValue._d = RTI_XCDR_TK_ULONGLONG;
+                ccPerf_g_tc_members[1]._annotations._defaultValue._u.ulong_long_value = 0ull;
+                ccPerf_g_tc_members[1]._annotations._minValue._d = RTI_XCDR_TK_ULONGLONG;
+                ccPerf_g_tc_members[1]._annotations._minValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MIN;
+                ccPerf_g_tc_members[1]._annotations._maxValue._d = RTI_XCDR_TK_ULONGLONG;
+                ccPerf_g_tc_members[1]._annotations._maxValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MAX;
 
                 ccPerf_g_tc_members[2]._annotations._defaultValue._d = RTI_XCDR_TK_ULONGLONG;
                 ccPerf_g_tc_members[2]._annotations._defaultValue._u.ulong_long_value = 0ull;
@@ -1387,12 +1346,12 @@ namespace rti {
                 ccPerf_g_tc_members[2]._annotations._maxValue._d = RTI_XCDR_TK_ULONGLONG;
                 ccPerf_g_tc_members[2]._annotations._maxValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MAX;
 
-                ccPerf_g_tc_members[3]._annotations._defaultValue._d = RTI_XCDR_TK_ULONGLONG;
-                ccPerf_g_tc_members[3]._annotations._defaultValue._u.ulong_long_value = 0ull;
-                ccPerf_g_tc_members[3]._annotations._minValue._d = RTI_XCDR_TK_ULONGLONG;
-                ccPerf_g_tc_members[3]._annotations._minValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MIN;
-                ccPerf_g_tc_members[3]._annotations._maxValue._d = RTI_XCDR_TK_ULONGLONG;
-                ccPerf_g_tc_members[3]._annotations._maxValue._u.ulong_long_value = RTIXCdrUnsignedLongLong_MAX;
+                ccPerf_g_tc_members[3]._annotations._defaultValue._d = RTI_XCDR_TK_ULONG;
+                ccPerf_g_tc_members[3]._annotations._defaultValue._u.ulong_value = 0u;
+                ccPerf_g_tc_members[3]._annotations._minValue._d = RTI_XCDR_TK_ULONG;
+                ccPerf_g_tc_members[3]._annotations._minValue._u.ulong_value = RTIXCdrUnsignedLong_MIN;
+                ccPerf_g_tc_members[3]._annotations._maxValue._d = RTI_XCDR_TK_ULONG;
+                ccPerf_g_tc_members[3]._annotations._maxValue._u.ulong_value = RTIXCdrUnsignedLong_MAX;
 
                 ccPerf_g_tc_members[4]._annotations._defaultValue._d = RTI_XCDR_TK_ULONG;
                 ccPerf_g_tc_members[4]._annotations._defaultValue._u.ulong_value = 0u;
@@ -1422,7 +1381,7 @@ namespace rti {
 
                 cctypes::ccPerf *sample;
 
-                static RTIXCdrMemberAccessInfo ccPerf_g_memberAccessInfos[9] =
+                static RTIXCdrMemberAccessInfo ccPerf_g_memberAccessInfos[10] =
                 {RTIXCdrMemberAccessInfo_INITIALIZER};
 
                 static RTIXCdrSampleAccessInfo ccPerf_g_sampleAccessInfo = 
@@ -1440,16 +1399,16 @@ namespace rti {
                 }
 
                 ccPerf_g_memberAccessInfos[0].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->destination_id() - (char *)sample);
-
-                ccPerf_g_memberAccessInfos[1].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->source_id() - (char *)sample);
-
-                ccPerf_g_memberAccessInfos[2].bindingMemberValueOffset[0] = 
                 (RTIXCdrUnsignedLong) ((char *)&sample->tStart() - (char *)sample);
 
+                ccPerf_g_memberAccessInfos[1].bindingMemberValueOffset[0] = 
+                (RTIXCdrUnsignedLong) ((char *)&sample->tDuration() - (char *)sample);
+
+                ccPerf_g_memberAccessInfos[2].bindingMemberValueOffset[0] = 
+                (RTIXCdrUnsignedLong) ((char *)&sample->data_count() - (char *)sample);
+
                 ccPerf_g_memberAccessInfos[3].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->tEnd() - (char *)sample);
+                (RTIXCdrUnsignedLong) ((char *)&sample->frames_per_sample() - (char *)sample);
 
                 ccPerf_g_memberAccessInfos[4].bindingMemberValueOffset[0] = 
                 (RTIXCdrUnsignedLong) ((char *)&sample->samples_count() - (char *)sample);
@@ -1465,6 +1424,9 @@ namespace rti {
 
                 ccPerf_g_memberAccessInfos[8].bindingMemberValueOffset[0] = 
                 (RTIXCdrUnsignedLong) ((char *)&sample->latency_max() - (char *)sample);
+
+                ccPerf_g_memberAccessInfos[9].bindingMemberValueOffset[0] = 
+                (RTIXCdrUnsignedLong) ((char *)&sample->latency_stddev() - (char *)sample);
 
                 ccPerf_g_sampleAccessInfo.memberAccessInfos = 
                 ccPerf_g_memberAccessInfos;
@@ -1536,13 +1498,11 @@ namespace rti {
 
                 static RTIBool is_initialized = RTI_FALSE;
 
-                static DDS_TypeCode ccControl_g_tc_destination_id_string;
-
                 static DDS_TypeCode_Member ccControl_g_tc_members[2]=
                 {
 
                     {
-                        (char *)"destination_id",/* Member name */
+                        (char *)"content_type",/* Member name */
                         {
                             0,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
@@ -1602,16 +1562,14 @@ namespace rti {
                     return &ccControl_g_tc;
                 }
 
-                ccControl_g_tc_destination_id_string = initialize_string_typecode(((cctypes::KEY_STRING_LEN)));
-
                 ccControl_g_tc._data._annotations._allowedDataRepresentationMask = 5;
 
-                ccControl_g_tc_members[0]._representation._typeCode = (RTICdrTypeCode *)&ccControl_g_tc_destination_id_string;
+                ccControl_g_tc_members[0]._representation._typeCode = (RTICdrTypeCode *)&::rti::topic::dynamic_type< cctypes::payloadTypesEnum>::get().native();
                 ccControl_g_tc_members[1]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulong;
 
                 /* Initialize the values for member annotations. */
-                ccControl_g_tc_members[0]._annotations._defaultValue._d = RTI_XCDR_TK_STRING;
-                ccControl_g_tc_members[0]._annotations._defaultValue._u.string_value = (DDS_Char *) "";
+                ccControl_g_tc_members[0]._annotations._defaultValue._d = RTI_XCDR_TK_ENUM;
+                ccControl_g_tc_members[0]._annotations._defaultValue._u.enumerated_value = 0;
 
                 ccControl_g_tc_members[1]._annotations._defaultValue._d = RTI_XCDR_TK_ULONG;
                 ccControl_g_tc_members[1]._annotations._defaultValue._u.ulong_value = 0u;
@@ -1652,7 +1610,7 @@ namespace rti {
                 }
 
                 ccControl_g_memberAccessInfos[0].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->destination_id() - (char *)sample);
+                (RTIXCdrUnsignedLong) ((char *)&sample->content_type() - (char *)sample);
 
                 ccControl_g_memberAccessInfos[1].bindingMemberValueOffset[0] = 
                 (RTIXCdrUnsignedLong) ((char *)&sample->frames_per_sample() - (char *)sample);
@@ -1779,19 +1737,16 @@ namespace dds {
 
         void topic_type_support< cctypes::ccBulk >::reset_sample(cctypes::ccBulk& sample) 
         {
-            sample.destination_id("");
             sample.content_type(cctypes::payloadTypesEnum::NO_PAYLOAD);
-            sample.source_id("");
+            sample.pub_id("");
             sample.tstamp_first_frame(0ull);
-            sample.status(0);
             ::rti::topic::reset_sample(sample.data());
         }
 
         void topic_type_support< cctypes::ccBulk >::allocate_sample(cctypes::ccBulk& sample, int, int) 
         {
-            ::rti::topic::allocate_sample(sample.destination_id(),  -1, (cctypes::KEY_STRING_LEN));
             ::rti::topic::allocate_sample(sample.content_type(),  -1, -1);
-            ::rti::topic::allocate_sample(sample.source_id(),  -1, (cctypes::KEY_STRING_LEN));
+            ::rti::topic::allocate_sample(sample.pub_id(),  -1, (cctypes::KEY_STRING_LEN));
             ::rti::topic::allocate_sample(sample.data(),  (cctypes::MAX_SEQUENCE_LEN), -1);
         }
 
@@ -1851,24 +1806,24 @@ namespace dds {
 
         void topic_type_support< cctypes::ccPerf >::reset_sample(cctypes::ccPerf& sample) 
         {
-            sample.destination_id("");
-            sample.source_id("");
             sample.tStart(0ull);
-            sample.tEnd(0ull);
+            sample.tDuration(0ull);
+            sample.data_count(0ull);
+            sample.frames_per_sample(0u);
             sample.samples_count(0u);
             sample.samples_dropped(0u);
             ::rti::topic::reset_sample(sample.latency_min());
             ::rti::topic::reset_sample(sample.latency_mean());
             ::rti::topic::reset_sample(sample.latency_max());
+            ::rti::topic::reset_sample(sample.latency_stddev());
         }
 
         void topic_type_support< cctypes::ccPerf >::allocate_sample(cctypes::ccPerf& sample, int, int) 
         {
-            ::rti::topic::allocate_sample(sample.destination_id(),  -1, (cctypes::KEY_STRING_LEN));
-            ::rti::topic::allocate_sample(sample.source_id(),  -1, (cctypes::KEY_STRING_LEN));
-            ::rti::topic::allocate_sample(sample.latency_min(),  -1, -1);
-            ::rti::topic::allocate_sample(sample.latency_mean(),  -1, -1);
-            ::rti::topic::allocate_sample(sample.latency_max(),  -1, -1);
+            ::rti::topic::allocate_sample(sample.latency_min(),  4L, -1);
+            ::rti::topic::allocate_sample(sample.latency_mean(),  4L, -1);
+            ::rti::topic::allocate_sample(sample.latency_max(),  4L, -1);
+            ::rti::topic::allocate_sample(sample.latency_stddev(),  4L, -1);
         }
 
         void topic_type_support< cctypes::ccControl >:: register_type(
@@ -1927,13 +1882,13 @@ namespace dds {
 
         void topic_type_support< cctypes::ccControl >::reset_sample(cctypes::ccControl& sample) 
         {
-            sample.destination_id("");
+            sample.content_type(cctypes::payloadTypesEnum::NO_PAYLOAD);
             sample.frames_per_sample(0u);
         }
 
         void topic_type_support< cctypes::ccControl >::allocate_sample(cctypes::ccControl& sample, int, int) 
         {
-            ::rti::topic::allocate_sample(sample.destination_id(),  -1, (cctypes::KEY_STRING_LEN));
+            ::rti::topic::allocate_sample(sample.content_type(),  -1, -1);
         }
 
     }

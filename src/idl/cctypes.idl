@@ -25,33 +25,31 @@ module cctypes {
     // this is the bulk datatype sent between users stations (usually over RWT or UDP LAN)
     struct ccBulk {
         @key
-        string<KEY_STRING_LEN> destination_id;      // where to send this sample
-        @key
         cctypes::payloadTypesEnum content_type;     // enum of the content type
-        string<KEY_STRING_LEN> source_id;           // who sent this sample
+        string<KEY_STRING_LEN> pub_id;              // ID string of the publisher
         uint64 tstamp_first_frame;                  // timestamp of first 188-byte frame put into data
-        uint8 status;                               // status of transfer
         sequence<octet, MAX_SEQUENCE_LEN> data;     // payload of data
     };
 
     // this type is used to send performance info from the ccBulk subscriber
     struct ccPerf {
         @key
-        string<KEY_STRING_LEN> destination_id;      // where to send this sample
-        string<KEY_STRING_LEN> source_id;           // who made the measurements
         uint64 tStart;                              // start of this measuring period
-        uint64 tEnd;                                // end of this measuring period
+        uint64 tDuration;                           // duration of this measuring period
+        uint64 data_count;                          // count of bytes sent this period
+        uint32 frames_per_sample;                   // count of 188-byte streaming frames per sample (received)
         uint32 samples_count;                       // count of samples this period
-        uint32 samples_dropped;                     // count of dropped samples (total)
-        uint64 latency_min[3];                      //  min latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
-        uint64 latency_mean[3];                     // mean latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
-        uint64 latency_max[3];                      //  max latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
+        uint32 samples_dropped;                     // count of dropped samples this period
+        sequence <int64,4> latency_min;             //  min latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
+        sequence <int64,4> latency_mean;            // mean latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
+        sequence <int64,4> latency_max;             //  max latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
+        sequence <uint64,4> latency_stddev;         // standard deviation of latencies during this period.
     };
 
     // this type is for making changes to the video publisher
     struct ccControl {
         @key
-        string<KEY_STRING_LEN> destination_id;      // where to send this sample
+        cctypes::payloadTypesEnum content_type;     // enum of the content type: what am I controlling?
         uint32 frames_per_sample;                   // how many 188-byte video frames per sample
     };
 };

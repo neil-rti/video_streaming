@@ -10,8 +10,8 @@ For more information, type 'rtiddsgen -help' at a command shell
 or consult the Code Generator User's Manual.
 */
 
-#ifndef cctypes_751230461_hpp
-#define cctypes_751230461_hpp
+#ifndef cctypes_751230475_hpp
+#define cctypes_751230475_hpp
 
 #include <iosfwd>
 
@@ -96,11 +96,9 @@ namespace cctypes {
         ccBulk();
 
         ccBulk(
-            const std::string& destination_id,
             const cctypes::payloadTypesEnum& content_type,
-            const std::string& source_id,
+            const std::string& pub_id,
             uint64_t tstamp_first_frame,
-            uint8_t status,
             const ::rti::core::bounded_sequence< uint8_t, (cctypes::MAX_SEQUENCE_LEN) >& data);
 
         #ifdef RTI_CXX11_RVALUE_REFERENCES
@@ -115,21 +113,6 @@ namespace cctypes {
         #endif
         #endif 
 
-        std::string& destination_id() OMG_NOEXCEPT {
-            return m_destination_id_;
-        }
-
-        const std::string& destination_id() const OMG_NOEXCEPT {
-            return m_destination_id_;
-        }
-
-        void destination_id(const std::string& value) {
-            m_destination_id_ = value;
-        }
-
-        void destination_id(std::string&& value) {
-            m_destination_id_ = std::move(value);
-        }
         cctypes::payloadTypesEnum& content_type() OMG_NOEXCEPT {
             return m_content_type_;
         }
@@ -145,20 +128,20 @@ namespace cctypes {
         void content_type(cctypes::payloadTypesEnum&& value) {
             m_content_type_ = std::move(value);
         }
-        std::string& source_id() OMG_NOEXCEPT {
-            return m_source_id_;
+        std::string& pub_id() OMG_NOEXCEPT {
+            return m_pub_id_;
         }
 
-        const std::string& source_id() const OMG_NOEXCEPT {
-            return m_source_id_;
+        const std::string& pub_id() const OMG_NOEXCEPT {
+            return m_pub_id_;
         }
 
-        void source_id(const std::string& value) {
-            m_source_id_ = value;
+        void pub_id(const std::string& value) {
+            m_pub_id_ = value;
         }
 
-        void source_id(std::string&& value) {
-            m_source_id_ = std::move(value);
+        void pub_id(std::string&& value) {
+            m_pub_id_ = std::move(value);
         }
         uint64_t& tstamp_first_frame() OMG_NOEXCEPT {
             return m_tstamp_first_frame_;
@@ -170,18 +153,6 @@ namespace cctypes {
 
         void tstamp_first_frame(uint64_t value) {
             m_tstamp_first_frame_ = value;
-        }
-
-        uint8_t& status() OMG_NOEXCEPT {
-            return m_status_;
-        }
-
-        const uint8_t& status() const OMG_NOEXCEPT {
-            return m_status_;
-        }
-
-        void status(uint8_t value) {
-            m_status_ = value;
         }
 
         ::rti::core::bounded_sequence< uint8_t, (cctypes::MAX_SEQUENCE_LEN) >& data() OMG_NOEXCEPT {
@@ -207,11 +178,9 @@ namespace cctypes {
 
       private:
 
-        std::string m_destination_id_;
         cctypes::payloadTypesEnum m_content_type_;
-        std::string m_source_id_;
+        std::string m_pub_id_;
         uint64_t m_tstamp_first_frame_;
-        uint8_t m_status_;
         ::rti::core::bounded_sequence< uint8_t, (cctypes::MAX_SEQUENCE_LEN) > m_data_;
 
     };
@@ -223,20 +192,29 @@ namespace cctypes {
 
     NDDSUSERDllExport std::ostream& operator<<(std::ostream& o, const ccBulk& sample);
 
+    #if (defined(RTI_WIN32) || defined (RTI_WINCE)) && defined(NDDS_USER_DLL_EXPORT)
+    // On Windows, dll-export template instantiations of standard types used by
+    // other dll-exported types
+    template class NDDSUSERDllExport std::allocator< int64_t >;
+    template class NDDSUSERDllExport std::vector< int64_t >;
+    template class NDDSUSERDllExport std::allocator< uint64_t >;
+    template class NDDSUSERDllExport std::vector< uint64_t >;
+    #endif
     class NDDSUSERDllExport ccPerf {
       public:
         ccPerf();
 
         ccPerf(
-            const std::string& destination_id,
-            const std::string& source_id,
             uint64_t tStart,
-            uint64_t tEnd,
+            uint64_t tDuration,
+            uint64_t data_count,
+            uint32_t frames_per_sample,
             uint32_t samples_count,
             uint32_t samples_dropped,
-            const ::dds::core::array< uint64_t, 3L>& latency_min,
-            const ::dds::core::array< uint64_t, 3L>& latency_mean,
-            const ::dds::core::array< uint64_t, 3L>& latency_max);
+            const ::rti::core::bounded_sequence< int64_t, 4L >& latency_min,
+            const ::rti::core::bounded_sequence< int64_t, 4L >& latency_mean,
+            const ::rti::core::bounded_sequence< int64_t, 4L >& latency_max,
+            const ::rti::core::bounded_sequence< uint64_t, 4L >& latency_stddev);
 
         #ifdef RTI_CXX11_RVALUE_REFERENCES
         #ifndef RTI_CXX11_NO_IMPLICIT_MOVE_OPERATIONS
@@ -250,36 +228,6 @@ namespace cctypes {
         #endif
         #endif 
 
-        std::string& destination_id() OMG_NOEXCEPT {
-            return m_destination_id_;
-        }
-
-        const std::string& destination_id() const OMG_NOEXCEPT {
-            return m_destination_id_;
-        }
-
-        void destination_id(const std::string& value) {
-            m_destination_id_ = value;
-        }
-
-        void destination_id(std::string&& value) {
-            m_destination_id_ = std::move(value);
-        }
-        std::string& source_id() OMG_NOEXCEPT {
-            return m_source_id_;
-        }
-
-        const std::string& source_id() const OMG_NOEXCEPT {
-            return m_source_id_;
-        }
-
-        void source_id(const std::string& value) {
-            m_source_id_ = value;
-        }
-
-        void source_id(std::string&& value) {
-            m_source_id_ = std::move(value);
-        }
         uint64_t& tStart() OMG_NOEXCEPT {
             return m_tStart_;
         }
@@ -292,16 +240,40 @@ namespace cctypes {
             m_tStart_ = value;
         }
 
-        uint64_t& tEnd() OMG_NOEXCEPT {
-            return m_tEnd_;
+        uint64_t& tDuration() OMG_NOEXCEPT {
+            return m_tDuration_;
         }
 
-        const uint64_t& tEnd() const OMG_NOEXCEPT {
-            return m_tEnd_;
+        const uint64_t& tDuration() const OMG_NOEXCEPT {
+            return m_tDuration_;
         }
 
-        void tEnd(uint64_t value) {
-            m_tEnd_ = value;
+        void tDuration(uint64_t value) {
+            m_tDuration_ = value;
+        }
+
+        uint64_t& data_count() OMG_NOEXCEPT {
+            return m_data_count_;
+        }
+
+        const uint64_t& data_count() const OMG_NOEXCEPT {
+            return m_data_count_;
+        }
+
+        void data_count(uint64_t value) {
+            m_data_count_ = value;
+        }
+
+        uint32_t& frames_per_sample() OMG_NOEXCEPT {
+            return m_frames_per_sample_;
+        }
+
+        const uint32_t& frames_per_sample() const OMG_NOEXCEPT {
+            return m_frames_per_sample_;
+        }
+
+        void frames_per_sample(uint32_t value) {
+            m_frames_per_sample_ = value;
         }
 
         uint32_t& samples_count() OMG_NOEXCEPT {
@@ -328,50 +300,65 @@ namespace cctypes {
             m_samples_dropped_ = value;
         }
 
-        ::dds::core::array< uint64_t, 3L>& latency_min() OMG_NOEXCEPT {
+        ::rti::core::bounded_sequence< int64_t, 4L >& latency_min() OMG_NOEXCEPT {
             return m_latency_min_;
         }
 
-        const ::dds::core::array< uint64_t, 3L>& latency_min() const OMG_NOEXCEPT {
+        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_min() const OMG_NOEXCEPT {
             return m_latency_min_;
         }
 
-        void latency_min(const ::dds::core::array< uint64_t, 3L>& value) {
+        void latency_min(const ::rti::core::bounded_sequence< int64_t, 4L >& value) {
             m_latency_min_ = value;
         }
 
-        void latency_min(::dds::core::array< uint64_t, 3L>&& value) {
+        void latency_min(::rti::core::bounded_sequence< int64_t, 4L >&& value) {
             m_latency_min_ = std::move(value);
         }
-        ::dds::core::array< uint64_t, 3L>& latency_mean() OMG_NOEXCEPT {
+        ::rti::core::bounded_sequence< int64_t, 4L >& latency_mean() OMG_NOEXCEPT {
             return m_latency_mean_;
         }
 
-        const ::dds::core::array< uint64_t, 3L>& latency_mean() const OMG_NOEXCEPT {
+        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_mean() const OMG_NOEXCEPT {
             return m_latency_mean_;
         }
 
-        void latency_mean(const ::dds::core::array< uint64_t, 3L>& value) {
+        void latency_mean(const ::rti::core::bounded_sequence< int64_t, 4L >& value) {
             m_latency_mean_ = value;
         }
 
-        void latency_mean(::dds::core::array< uint64_t, 3L>&& value) {
+        void latency_mean(::rti::core::bounded_sequence< int64_t, 4L >&& value) {
             m_latency_mean_ = std::move(value);
         }
-        ::dds::core::array< uint64_t, 3L>& latency_max() OMG_NOEXCEPT {
+        ::rti::core::bounded_sequence< int64_t, 4L >& latency_max() OMG_NOEXCEPT {
             return m_latency_max_;
         }
 
-        const ::dds::core::array< uint64_t, 3L>& latency_max() const OMG_NOEXCEPT {
+        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_max() const OMG_NOEXCEPT {
             return m_latency_max_;
         }
 
-        void latency_max(const ::dds::core::array< uint64_t, 3L>& value) {
+        void latency_max(const ::rti::core::bounded_sequence< int64_t, 4L >& value) {
             m_latency_max_ = value;
         }
 
-        void latency_max(::dds::core::array< uint64_t, 3L>&& value) {
+        void latency_max(::rti::core::bounded_sequence< int64_t, 4L >&& value) {
             m_latency_max_ = std::move(value);
+        }
+        ::rti::core::bounded_sequence< uint64_t, 4L >& latency_stddev() OMG_NOEXCEPT {
+            return m_latency_stddev_;
+        }
+
+        const ::rti::core::bounded_sequence< uint64_t, 4L >& latency_stddev() const OMG_NOEXCEPT {
+            return m_latency_stddev_;
+        }
+
+        void latency_stddev(const ::rti::core::bounded_sequence< uint64_t, 4L >& value) {
+            m_latency_stddev_ = value;
+        }
+
+        void latency_stddev(::rti::core::bounded_sequence< uint64_t, 4L >&& value) {
+            m_latency_stddev_ = std::move(value);
         }
 
         bool operator == (const ccPerf& other_) const;
@@ -381,15 +368,16 @@ namespace cctypes {
 
       private:
 
-        std::string m_destination_id_;
-        std::string m_source_id_;
         uint64_t m_tStart_;
-        uint64_t m_tEnd_;
+        uint64_t m_tDuration_;
+        uint64_t m_data_count_;
+        uint32_t m_frames_per_sample_;
         uint32_t m_samples_count_;
         uint32_t m_samples_dropped_;
-        ::dds::core::array< uint64_t, 3L> m_latency_min_;
-        ::dds::core::array< uint64_t, 3L> m_latency_mean_;
-        ::dds::core::array< uint64_t, 3L> m_latency_max_;
+        ::rti::core::bounded_sequence< int64_t, 4L > m_latency_min_;
+        ::rti::core::bounded_sequence< int64_t, 4L > m_latency_mean_;
+        ::rti::core::bounded_sequence< int64_t, 4L > m_latency_max_;
+        ::rti::core::bounded_sequence< uint64_t, 4L > m_latency_stddev_;
 
     };
 
@@ -405,7 +393,7 @@ namespace cctypes {
         ccControl();
 
         ccControl(
-            const std::string& destination_id,
+            const cctypes::payloadTypesEnum& content_type,
             uint32_t frames_per_sample);
 
         #ifdef RTI_CXX11_RVALUE_REFERENCES
@@ -420,20 +408,20 @@ namespace cctypes {
         #endif
         #endif 
 
-        std::string& destination_id() OMG_NOEXCEPT {
-            return m_destination_id_;
+        cctypes::payloadTypesEnum& content_type() OMG_NOEXCEPT {
+            return m_content_type_;
         }
 
-        const std::string& destination_id() const OMG_NOEXCEPT {
-            return m_destination_id_;
+        const cctypes::payloadTypesEnum& content_type() const OMG_NOEXCEPT {
+            return m_content_type_;
         }
 
-        void destination_id(const std::string& value) {
-            m_destination_id_ = value;
+        void content_type(const cctypes::payloadTypesEnum& value) {
+            m_content_type_ = value;
         }
 
-        void destination_id(std::string&& value) {
-            m_destination_id_ = std::move(value);
+        void content_type(cctypes::payloadTypesEnum&& value) {
+            m_content_type_ = std::move(value);
         }
         uint32_t& frames_per_sample() OMG_NOEXCEPT {
             return m_frames_per_sample_;
@@ -454,7 +442,7 @@ namespace cctypes {
 
       private:
 
-        std::string m_destination_id_;
+        cctypes::payloadTypesEnum m_content_type_;
         uint32_t m_frames_per_sample_;
 
     };
@@ -662,5 +650,5 @@ namespace rti {
 #define NDDSUSERDllExport
 #endif
 
-#endif // cctypes_751230461_hpp
+#endif // cctypes_751230475_hpp
 

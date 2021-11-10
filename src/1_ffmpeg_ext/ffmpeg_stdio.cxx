@@ -20,33 +20,11 @@
 #include <rti/util/util.hpp>      // for sleep()
 #include "rti_comms.hpp"          // for Connext pub/sub
 #include "murmurhash3.h"          // for hashing
+#include "com_perf.hpp"           // for latency measurement
 #include "app_helper.hpp"         // for command line args and signals
 
-// a few globals for convenience (measuring performance)
-// in-process vars
-uint64_t tPeriodNanosecs = 200000000;   // measurement period: 200mS
-uint64_t tPeriodStart = 0;        // start of measurement period
-uint64_t tLatencySums[3];         // sums of latencies between dataflow points
-uint64_t tLatencyMins[3];         // minimum latency between dataflow points
-uint64_t tLatencyMaxs[3];         // maximum latency between dataflow points
-uint32_t samplesInPeriod = 0;     // number of samples in measurement period
-uint64_t dataSizeInPeriod = 0;    // total bytes sent in period
-uint32_t dropCount = 0;           // total samples dropped
-uint32_t lastSeqNum = 0;          // last seq. number (to detect drops)
-
-// finished data from a period, ready to be sent
-bool perf_data_ready = false;     // data is ready to copy and send            
-uint64_t rStart = 0;              // start of this measuring period
-uint64_t rEnd = 0;                // end of this measuring period
-uint32_t rSamples_count = 0;      // count of samples this period
-uint32_t rSamples_dropped = 0;    // count of dropped samples (total)
-uint64_t rLatency_min[3];         //  min latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
-uint64_t rLatency_mean[3];        // mean latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
-uint64_t rLatency_max[3];         //  max latency at firstFrameInSendBuf[0], transport[1], rcvToAppReady[2]
-
-// overall stats
-uint32_t totalSampleCount = 0;
-uint64_t totalDataSize = 0;
+// class for measuring perf/latency
+comPerf perfRep;
 
 /** ----------------------------------------------------------------
  * contact_name_to_id()
@@ -92,74 +70,33 @@ void contact_name_to_id(std::string name, std::string &id)
  **/
 int vid_data_sub(dds::sub::DataReader<cctypes::ccBulk> reader)
 {
-    // Take all samples
-    int count = 0;
-    dds::sub::LoanedSamples<cctypes::ccBulk> samples = reader.take();
-    for (const auto& sample : samples) {
-      if (sample.info().valid()) {
-        // measure latencies and accumulate results
-        uint64_t tRcvApp = tstamp_u64_get();
-        uint64_t tLat[3];
-        tLat[0] = (sample.info().source_timestamp().to_microsecs() * 1000) - sample.data().tstamp_first_frame();
-        tLat[1] = (sample.info().extensions().reception_timestamp().to_microsecs() * 1000) - (sample.info().source_timestamp().to_microsecs() * 1000);
-        tLat[2] = tRcvApp - (sample.info().extensions().reception_timestamp().to_microsecs() * 1000);
-        for(int t=0 ; t<3 ; t++) {
-          if(tLat[t] < tLatencyMins[t]) tLatencyMins[t] = tLat[t];
-          if(tLat[t] > tLatencyMaxs[t]) tLatencyMaxs[t] = tLat[t];
-          tLatencySums[t] += tLat[t];          
-        }
-        samplesInPeriod++;
-        totalSampleCount++;
-        dataSizeInPeriod += (25 + sizeof(cctypes::payloadTypesEnum) + sample.data().data().size());
-        totalDataSize += (25 + sizeof(cctypes::payloadTypesEnum) + sample.data().data().size());
-
-        if((lastSeqNum != 0) && (sample.info().extensions().publication_sequence_number().value() != (lastSeqNum + 1))) {
-          dropCount++;
-        }
-        lastSeqNum = sample.info().extensions().publication_sequence_number().value();
-
-
-        // is it time to finish the measurement period?
-        if((tPeriodStart + tPeriodNanosecs) < tRcvApp)
-        {
-          // update the ready-to-send global values
-          rStart = tPeriodStart;
-          rEnd = tRcvApp;
-          rSamples_count = samplesInPeriod;
-          rSamples_dropped = dropCount;
-          for(int i=0 ; i<3 ; i++)
-          {
-            rLatency_min[i] = tLatencyMins[i];
-            rLatency_max[i] = tLatencyMaxs[i];
-            rLatency_mean[i] = tLatencySums[i] / samplesInPeriod;
-          }
-          perf_data_ready = true;
-
-          // now reset the in-process vars for the next period.
-          for(int i=0 ; i<3 ; i++) {
-            tLatencyMins[i] = (uint64_t)-1;
-            tLatencyMaxs[i] = 0;
-            tLatencySums[i] = 0;
-          }
-          samplesInPeriod = 0;
-          dataSizeInPeriod = 0;
-          tPeriodStart = tRcvApp;
-        }
-
-        // write the data to external FFMPEG via stdio
-        const size_t size = sample.data().data().size();
-        uint32_t chunk = 0;
-        for (size_t i = 0; i < size;) {
-          if((size-i) > 188) { chunk = 188; } else { chunk = (size-i); }
-          i += ::write(1, sample.data().data().data() + i, chunk);
-        }
-        count++;
-      } else {
-        std::cout << "Instance state changed to "
-          << sample.info().state().instance_state() << std::endl;
+  // Take all samples
+  int count = 0;
+  dds::sub::LoanedSamples<cctypes::ccBulk> samples = reader.take();
+  for (const auto& sample : samples) {
+    if (sample.info().valid()) {
+      // measure latencies and accumulate results
+      uint64_t tRcvApp = tstamp_u64_get();
+      perfRep.tStampData.at(0) = sample.data().tstamp_first_frame();
+      perfRep.tStampData.at(1) = (sample.info().source_timestamp().to_microsecs() * 1000);
+      perfRep.tStampData.at(2) = (sample.info().extensions().reception_timestamp().to_microsecs() * 1000);
+      perfRep.tStampData.at(3) = tRcvApp;
+      const size_t size = sample.data().data().size();
+      perfRep.perf_data_new(sample.info().extensions().publication_sequence_number().value(), size,
+                            (16 + sizeof(cctypes::payloadTypesEnum)));
+      // write the data to external FFMPEG via stdio
+      uint32_t chunk = 0;
+      for (size_t i = 0; i < size;) {
+        if((size-i) > 188) { chunk = 188; } else { chunk = (size-i); }
+        i += ::write(1, sample.data().data().data() + i, chunk);
       }
+      count++;
+    } else {
+      std::cout << "Instance state changed to "
+        << sample.info().state().instance_state() << std::endl;
     }
-    return count; 
+  }
+  return count;
 }
 
 
@@ -167,41 +104,53 @@ int vid_data_sub(dds::sub::DataReader<cctypes::ccBulk> reader)
  * participant_main()
  **/
 void participant_main(application::ApplicationArguments args)
-{
-  // Create a DomainParticipant with default Qos
-  dds::domain::DomainParticipant participant(args.domain_id);
-
-  // Instantiate an rticomms class, with BestEffort pub or sub
-  uint32_t cnxDir = 0;
-  if(args.pub_else_sub) {
-    cnxDir = CTRL_PUB_BE;
-  }
-  else {
-    cnxDir = CTRL_SUB_BE;
-  }
-  dds::core::cond::WaitSet waitset;
-  rtiComms cnxStream(args.topic_name, cnxDir, participant, &waitset, &vid_data_sub);
-  
+{  
   // setup ----------------------------------------------------
-  // convert names to ID strings (used as Keys in DDS topic)
+  // convert names to ID strings (used as DDS topic name)
   std::string myId, farId;
   contact_name_to_id(args.near_name, myId);
   contact_name_to_id(args.far_name, farId);
   fprintf(stderr, "myId:  [%s], myName:  '%s'\n", myId.c_str(), args.near_name.c_str());
   fprintf(stderr, "%s\n", args.pub_else_sub ? "publishing to" : "subcribing to");
   fprintf(stderr, "FarID: [%s], FarName: '%s'\n", farId.c_str(), args.far_name.c_str());
-  fprintf(stderr, "on topic %s\n", args.topic_name.c_str());
+//  fprintf(stderr, "on topic %s\n", args.topic_name.c_str());
+
+  // Create a DomainParticipant with default Qos
+  dds::domain::DomainParticipant participant(args.domain_id);
+
+  // Instantiate an rticomms class, with BestEffort pub or sub
+  uint32_t cnxDir = 0;
+  std::string topicId;
+  if(args.pub_else_sub) {
+    cnxDir = CTRL_PUB_BE;
+    topicId = "v" + farId;
+  }
+  else {
+    cnxDir = CTRL_SUB_BE;
+    topicId = "v" + myId;
+  }
+  dds::core::cond::WaitSet waitset;
+  rtiComms cnxStream(topicId, cnxDir, participant, &waitset, &vid_data_sub);
 
   // publisher -----------------------------------------
   if(args.pub_else_sub) {
-    cnxStream.pub_sample_source_id_set(myId);
-    cnxStream.pub_sample_destination_id_set(farId);
     cnxStream.pub_sample_data_size_set(args.pub_data_size);
     cnxStream.pub_sample_content_type_set(cctypes::payloadTypesEnum::STREAM_FFMPEG_0);
+    rtiComPubCtrl ctrlSub(std::string("c" + myId), CTRL_SUB_BE, participant, &waitset);
 
     uint32_t i = 0;
     bool new_frame_group = true;
     while(false == application::shutdown_requested) {
+      // check for any control samples
+      waitset.dispatch(dds::core::Duration(0, 50000));
+      if(ctrlSub.sub_samples_in_queue()) {
+        uint32_t newSize = ctrlSub.oldest_sub_sample().frames_per_sample();
+        fprintf(stderr, "New size: %u\n", newSize);
+        args.pub_data_size = newSize * 188;
+        cnxStream.pub_sample_data_size_set(args.pub_data_size);
+        ctrlSub.pop_oldest_sub_sample();
+      }
+
       // poll for stdin
       pollfd fd{0, POLLIN, 0};
       if (::poll(&fd, 1, 100) > 0) {
@@ -227,23 +176,32 @@ void participant_main(application::ApplicationArguments args)
   }
   else {  // subscriber
     // create a publisher of the latency measurements
-    rtiComPerf perfPub("testTopicName", CTRL_PUB_BE, participant);
-    perfPub.pub_sample_source_id_set(myId);
-    perfPub.pub_sample_destination_id_set(farId);
+    rtiComPerf perfPub(std::string("m" + myId), CTRL_PUB_BE, participant);
+    perfRep.interval_set_msec(200);
     while (false == application::shutdown_requested) {
       waitset.dispatch(dds::core::Duration(0, 50000));
 
       // time to publish performance results?
-      if(perf_data_ready) {
-        perfPub.pub_sample_latency_min_set(rLatency_min);
-        perfPub.pub_sample_latency_mean_set(rLatency_mean);
-        perfPub.pub_sample_latency_max_set(rLatency_max);
-        perfPub.pub_sample_count_samples_set(rSamples_count);
-        perfPub.pub_sample_drop_samples_set(rSamples_dropped);
-        perfPub.pub_sample_tstart_set(rStart);
-        perfPub.pub_sample_tend_set(rEnd);
+      if(perfRep.perf_data_ready) {
+#if 1
+        perfPub.pub_sample_latency_min_set(perfRep.latencyMin);
+        perfPub.pub_sample_latency_mean_set(perfRep.latencyMean);
+        perfPub.pub_sample_latency_max_set(perfRep.latencyMax);
+        perfPub.pub_sample_latency_stddev_set(perfRep.latencyStdDev);
+        perfPub.pub_sample_count_samples_set(perfRep.samplesInInterval);
+        perfPub.pub_sample_count_data_set(perfRep.dataSumInInterval);
+        perfPub.pub_sample_drop_samples_set(perfRep.dropCount);
+        perfPub.pub_sample_frames_per_sample_set(perfRep.framesPerSample);
+        perfPub.pub_sample_tstart_set(perfRep.intervalActualStart);
+        perfPub.pub_sample_tduration_set(perfRep.intervalActualDuration);
         perfPub.publish();
-        perf_data_ready = false;
+#else
+        for(int i=0 ; i<4 ; i++) {
+          fprintf(stderr, "%d: %lu, %lu, %lu, %lu\n", i, perfRep.latencyMin.at(i),perfRep.latencyMean.at(i),perfRep.latencyMax.at(i),perfRep.latencyStdDev.at(i));
+        }
+        fprintf(stderr, "interval: %lu, samples: %u, dataSum: %lu, drops: %u\n", perfRep.intervalActual, perfRep.samplesInterval, perfRep.dataSumInterval, perfRep.dropCount);
+#endif
+        perfRep.perf_data_ready = false;
       }
     }
   }
