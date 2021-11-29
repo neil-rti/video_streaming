@@ -220,8 +220,7 @@ void participant_main(application::ApplicationArguments args)
     std::cout << "UDP Connected" << std::endl;
 #endif
     char tmpBuf[39072];         // set to (max sample size * 2) + 1472
-    int32_t inp = 0;            // insert point
-    uint32_t i = 0;
+    int32_t tbi = 0;            // tmpBuf index
     bool new_frame_group = true;
     while(false == application::shutdown_requested) {
       // check for any control samples
@@ -234,93 +233,50 @@ void participant_main(application::ApplicationArguments args)
         ctrlSub.pop_oldest_sub_sample();
       }
 
-#if 1 // wait for UDP from FFMPEG
 #ifdef WIN32      //Receive an incoming message
       int udp_bytes_rcvd = recvfrom(serverSocket, &tmpBuf[inp], 2048,
             0, (SOCKADDR*)&senderAddr, &senderAddrSize);
       if (udp_bytes_rcvd == SOCKET_ERROR) {
             printf("recvfrom failed with error %d\n", WSAGetLastError());
       }
-      i += udp_bytes_rcvd;
-      inp += udp_bytes_rcvd;
-      fprintf(stderr, "UDPin: %lu, inp: %d\n", udp_bytes_rcvd, inp);
-//      if (recv(s, reinterpret_cast<char *>(cnxStream.pub_sample_data() + i), 188, 0) < 0) {
-//          std::cout << "Receive failed" << std::endl;
-//      }
-#else
-      if( recv(sock, cnxStream.pub_sample_data() + i, 188, 0) < 0) {      
-        std::cout << "Receive failed" << std::endl;
+#else   // Linux
+      int udp_bytes_rcvd = recv(sock, &tmpBuf[tbi], 2048, 0);
+      if( udp_bytes_rcvd < 0) {      
+        std::cout << "recv failed" << std::endl;
       }
-#endif 
+#endif
+      tbi += udp_bytes_rcvd;
+
       if(new_frame_group) {
         cnxStream.pub_sample_tstamp_first_frame();
         new_frame_group = false;
       }
-#if 1
-      while (i >= 1) {
-          // copy data into pub sample
-          fprintf(stderr, "DDSout: %d, i: %d --> %d\n", args.pub_data_size, i, i - args.pub_data_size);
-          cnxStream.pub_sample_data_size_set(udp_bytes_rcvd);
-          memcpy(cnxStream.pub_sample_data(), tmpBuf, udp_bytes_rcvd);
-          inp = 0;
-          i = 0;
-          new_frame_group = true;
-          while (false == application::shutdown_requested) {
-              try {
-                  cnxStream.publish();
-                  break;
-              }
-              catch (...) {
-                  std::cerr << "Write operation timed out, retrying..." << std::endl;
-              }
-          }
-      }
 
-#else
-      while(i >= args.pub_data_size) {
-        // copy data into pub sample
-          fprintf(stderr, "DDSout: %d, i: %d --> %d\n", args.pub_data_size, i, i-args.pub_data_size);
+      // send only when we have enough packets for a full sample
+      while(tbi >= args.pub_data_size)
+      {
+        // copy from tmpBuf into pub sample
+        cnxStream.pub_sample_data_size_set(args.pub_data_size);
         memcpy(cnxStream.pub_sample_data(), tmpBuf, args.pub_data_size);
-        if (inp > args.pub_data_size) {
-          memcpy(tmpBuf, &tmpBuf[args.pub_data_size], (inp - args.pub_data_size));
-          inp -= args.pub_data_size;
-        }
-        i -= args.pub_data_size;
+
+        // move any excess to the start of tmpBuf
+        memmove(tmpBuf, &tmpBuf[args.pub_data_size], tbi-args.pub_data_size);
+
+        // update index
+        tbi -= args.pub_data_size;
+
+        // publish
         new_frame_group = true;
         while (false == application::shutdown_requested) {
           try {
             cnxStream.publish();
             break;
-          } catch (...) {
+          }
+          catch (...) {
             std::cerr << "Write operation timed out, retrying..." << std::endl;
           }
         }
       }
-#endif
-
-#else
-      // poll for stdin
-      pollfd fd{0, POLLIN, 0};
-      if (::poll(&fd, 1, 100) > 0) {
-        i += ::read(fd.fd, cnxStream.pub_sample_data() + i, 188);
-        if(new_frame_group) {
-          cnxStream.pub_sample_tstamp_first_frame();
-          new_frame_group = false;
-        }
-        if(i >= args.pub_data_size) {
-          i=0;
-          new_frame_group = true;
-          while (false == application::shutdown_requested) {
-            try {
-              cnxStream.publish();
-              break;
-            } catch (...) {
-              std::cerr << "Write operation timed out, retrying..." << std::endl;
-            }
-          }
-        }
-      }
-#endif
     }
   }
   else {  // subscriber
