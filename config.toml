@@ -5,4 +5,4 @@ far_name = "Sub-Station"
 domain = 0
 pubsub = "sub"
 reliability  = "best effort"
-data_chunk_size = 1316
+data_chunk_size = 1504

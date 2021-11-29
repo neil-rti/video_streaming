@@ -30,5 +30,15 @@ Then the publisher:
     ffmpeg -re -i RTI-vehicles-captioned.mp4 -g 15 -pix_fmt yuv420p -vcodec libx264 -preset ultrafast -tune zerolatency -f mpegts pipe:1 | ./build/vsffmpeg_ext -p pub -n BeThePub -f BeTheSub
 
 
+Here is the same for a UDP connection to FFMPEG:  
+
+    ffplay -fflags nobuffer -i udp://127.0.0.1:2278
+
+    ./build/vsffmpeg_udp -p sub -n BeTheSub -f BeThePub
+
+    ffmpeg -re -i RTI-vehicles-captioned-480.mp4 -g 15 -pix_fmt yuv420p -vcodec libx264 -preset ultrafast -tune zerolatency -f mpegts udp://127.0.0.1:2277
+
+    ./build/vsffmpeg_udp -p pub -n BeThePub -f BeTheSub
+
 (this is a starter README)  
 EOF.

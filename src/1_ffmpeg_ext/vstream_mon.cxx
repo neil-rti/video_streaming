@@ -17,7 +17,9 @@
 #include <fstream>
 #include <thread>                 // thread for keyboard input(blocking)
 #include <queue>                  // queue for passing keyboard entries
+#ifndef WIN32
 #include <poll.h>                 // stdio polling
+#endif
 #include <signal.h>               // ctrl-c handler
 #include <rti/util/util.hpp>      // for sleep()
 #include "rti_comms.hpp"          // for Connext pub/sub

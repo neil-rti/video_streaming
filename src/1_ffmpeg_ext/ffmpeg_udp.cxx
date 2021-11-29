@@ -18,6 +18,7 @@
 // #include <poll.h>                 // stdio polling
 #include <signal.h>               // ctrl-c handler
 #ifdef WIN32
+#include <WinSock2.h>
 #else
 #include <arpa/inet.h>            // htons, inet_addr
 #include <netinet/in.h>           // sockaddr_in
@@ -39,6 +40,10 @@ std::string hostname("127.0.0.1");
 uint16_t port_base = 2277;
 sockaddr_in destination;
 int sock;
+#ifdef WIN32
+sockaddr_in local;
+SOCKET s;
+#endif
 
 
 
@@ -101,13 +106,22 @@ int vid_data_sub(dds::sub::DataReader<cctypes::ccBulk> reader)
       perfRep.perf_data_new(sample.info().extensions().publication_sequence_number().value(), size,
                             (16 + sizeof(cctypes::payloadTypesEnum)));
 
+
       // write the data to external FFMPEG via UDP socket
+#ifdef WIN32
+      int bqty = sendto(s, reinterpret_cast<const char*>(sample.data().data().data()),
+          sample.data().data().size(), 0, (sockaddr*)&local, sizeof(local));
+      fprintf(stderr, "DDSrcv: %d bytes\n", bqty);
+
+#else
       uint32_t chunk = 0;
       for (size_t i = 0; i < size;) {
-        if((size-i) > 188) { chunk = 188; } else { chunk = (size-i); }
-          i += ::sendto(sock, sample.data().data().data() + i, chunk, 0, 
-                      reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+        if ((size - i) > 188) { chunk = 188; }
+        else { chunk = (size - i); }
+        i += ::sendto(sock, sample.data().data().data() + i, chunk, 0,
+              reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
       }
+#endif
       count++;
     } else {
       std::cout << "Instance state changed to "
@@ -156,7 +170,44 @@ void participant_main(application::ApplicationArguments args)
     cnxStream.pub_sample_content_type_set(cctypes::payloadTypesEnum::STREAM_FFMPEG_0);
     rtiComPubCtrl ctrlSub(std::string("c" + myId), CTRL_SUB_BE, participant, &waitset);
 
-    // open a UDP socket to FFMPEG
+#ifdef WIN32    // open a UDP socket to FFMPEG
+    WSADATA wsaData;
+    int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (res != NO_ERROR) {
+        printf("WSAStartup failed with error %d\n", res);
+        return;
+    }
+
+    SOCKET serverSocket = INVALID_SOCKET;
+    serverSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (serverSocket == INVALID_SOCKET) {
+        printf("socket failed with error %d\n", WSAGetLastError());
+        return;
+    }
+
+    struct sockaddr_in serverAddr;
+    struct sockaddr_in senderAddr;
+    int senderAddrSize = sizeof(senderAddr);
+    short port = 2277;
+
+    // Bind the socket to any address and the specified port.
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(port);
+    // OR, you can do serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    serverAddr.sin_addr.s_addr = inet_addr(hostname.c_str());
+
+    if (bind(serverSocket, (SOCKADDR*)&serverAddr, sizeof(serverAddr))) {
+        printf("bind failed with error %d\n", WSAGetLastError());
+        return;
+    }
+    //WSAData data;
+    //WSAStartup(MAKEWORD(2, 2), &data);
+    //local.sin_family = AF_INET;
+    //inet_pton(AF_INET, hostname.c_str(), &local.sin_addr.S_un);
+    //local.sin_port = htons(port_base);
+    //s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    //bind(s, (sockaddr*)&local, sizeof(local));
+#else
     sock = ::socket(AF_INET, SOCK_DGRAM, 0);
     destination.sin_family = AF_INET;
     destination.sin_port = htons(port_base);
@@ -167,7 +218,9 @@ void participant_main(application::ApplicationArguments args)
       std::cout << "UDP Connection error" << std::endl;
     }
     std::cout << "UDP Connected" << std::endl;
-
+#endif
+    char tmpBuf[39072];         // set to (max sample size * 2) + 1472
+    int32_t inp = 0;            // insert point
     uint32_t i = 0;
     bool new_frame_group = true;
     while(false == application::shutdown_requested) {
@@ -182,17 +235,57 @@ void participant_main(application::ApplicationArguments args)
       }
 
 #if 1 // wait for UDP from FFMPEG
-      //Receive an incoming message
+#ifdef WIN32      //Receive an incoming message
+      int udp_bytes_rcvd = recvfrom(serverSocket, &tmpBuf[inp], 2048,
+            0, (SOCKADDR*)&senderAddr, &senderAddrSize);
+      if (udp_bytes_rcvd == SOCKET_ERROR) {
+            printf("recvfrom failed with error %d\n", WSAGetLastError());
+      }
+      i += udp_bytes_rcvd;
+      inp += udp_bytes_rcvd;
+      fprintf(stderr, "UDPin: %lu, inp: %d\n", udp_bytes_rcvd, inp);
+//      if (recv(s, reinterpret_cast<char *>(cnxStream.pub_sample_data() + i), 188, 0) < 0) {
+//          std::cout << "Receive failed" << std::endl;
+//      }
+#else
       if( recv(sock, cnxStream.pub_sample_data() + i, 188, 0) < 0) {      
         std::cout << "Receive failed" << std::endl;
       }
-      
+#endif 
       if(new_frame_group) {
         cnxStream.pub_sample_tstamp_first_frame();
         new_frame_group = false;
       }
-      if(i >= args.pub_data_size) {
-        i=0;
+#if 1
+      while (i >= 1) {
+          // copy data into pub sample
+          fprintf(stderr, "DDSout: %d, i: %d --> %d\n", args.pub_data_size, i, i - args.pub_data_size);
+          cnxStream.pub_sample_data_size_set(udp_bytes_rcvd);
+          memcpy(cnxStream.pub_sample_data(), tmpBuf, udp_bytes_rcvd);
+          inp = 0;
+          i = 0;
+          new_frame_group = true;
+          while (false == application::shutdown_requested) {
+              try {
+                  cnxStream.publish();
+                  break;
+              }
+              catch (...) {
+                  std::cerr << "Write operation timed out, retrying..." << std::endl;
+              }
+          }
+      }
+
+#else
+      while(i >= args.pub_data_size) {
+        // copy data into pub sample
+          fprintf(stderr, "DDSout: %d, i: %d --> %d\n", args.pub_data_size, i, i-args.pub_data_size);
+        memcpy(cnxStream.pub_sample_data(), tmpBuf, args.pub_data_size);
+        if (inp > args.pub_data_size) {
+          memcpy(tmpBuf, &tmpBuf[args.pub_data_size], (inp - args.pub_data_size));
+          inp -= args.pub_data_size;
+        }
+        i -= args.pub_data_size;
         new_frame_group = true;
         while (false == application::shutdown_requested) {
           try {
@@ -203,6 +296,7 @@ void participant_main(application::ApplicationArguments args)
           }
         }
       }
+#endif
 
 #else
       // poll for stdin
@@ -234,7 +328,41 @@ void participant_main(application::ApplicationArguments args)
     rtiComPerf perfPub(std::string("m" + myId), CTRL_PUB_BE, participant);
     perfRep.interval_set_msec(200);
 
-    // open a UDP socket to FFPLAY
+
+#ifdef WIN32    // open a UDP socket to FFPLAY
+    WSADATA wsaData;
+    int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (res != NO_ERROR) {
+        printf("WSAStartup failed with error %d\n", res);
+        return;
+    }
+
+    s = INVALID_SOCKET;
+    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (s == INVALID_SOCKET) {
+        printf("socket failed with error %d\n", WSAGetLastError());
+        return;
+    }
+
+    
+    // Bind the socket to any address and the specified port.
+    local.sin_family = AF_INET;
+    local.sin_port = htons(port_base + 1);
+    local.sin_addr.s_addr = inet_addr(hostname.c_str());
+
+    if (bind(s, (SOCKADDR*)&local, sizeof(local))) {
+        printf("bind failed with error %d\n", WSAGetLastError());
+        return;
+    }
+
+//    WSAData data;
+//    WSAStartup(MAKEWORD(2, 2), &data);
+//    local.sin_family = AF_INET;
+//    inet_pton(AF_INET, hostname.c_str(), &local.sin_addr.S_un);
+//    local.sin_port = htons(port_base + 1);
+//    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+//    bind(s, (sockaddr*)&local, sizeof(local));
+#else
     sock = ::socket(AF_INET, SOCK_DGRAM, 0);
     destination.sin_family = AF_INET;
     destination.sin_port = htons(port_base + 1);
@@ -244,7 +372,7 @@ void participant_main(application::ApplicationArguments args)
       std::cout << "UDP Connection error" << std::endl;
     }
     std::cout << "UDP Connected" << std::endl;
-
+#endif
     while (false == application::shutdown_requested) {
       waitset.dispatch(dds::core::Duration(0, 50000));
 
@@ -271,7 +399,12 @@ void participant_main(application::ApplicationArguments args)
         perfRep.perf_data_ready = false;
       }
     }
+#ifdef WIN32        // FIXME: move these to outside of pub/sub
+    closesocket(s);
+    WSACleanup();
+#else
     ::close(sock);
+#endif
   }
 }
 
