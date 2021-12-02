@@ -71,7 +71,7 @@ public:
         return oldestSample;
     }
     cctypes::ccBulk oldest_sub_sample(void) { return sub_samples.front(); }
-    uint32_t sub_samples_in_queue(void) { return sub_samples.size(); }
+    uint32_t sub_samples_in_queue(void) { return (uint32_t)sub_samples.size(); }
     void pop_oldest_sub_sample(void) { sub_samples.pop(); }
 
 private:
@@ -127,7 +127,7 @@ public:
         return oldestSample;
     }
     cctypes::ccPerf oldest_sub_sample(void) { return sub_samples.front(); }
-    uint32_t sub_samples_in_queue(void) { return sub_samples.size(); }
+    uint32_t sub_samples_in_queue(void) { return (uint32_t)sub_samples.size(); }
     void pop_oldest_sub_sample(void) { sub_samples.pop(); }
 
 private:
@@ -173,7 +173,7 @@ public:
         return oldestSample;
     }
     cctypes::ccControl oldest_sub_sample(void) { return sub_samples.front(); }
-    uint32_t sub_samples_in_queue(void) { return sub_samples.size(); }
+    uint32_t sub_samples_in_queue(void) { return (uint32_t)sub_samples.size(); }
     void pop_oldest_sub_sample(void) { sub_samples.pop(); }
 
 private:

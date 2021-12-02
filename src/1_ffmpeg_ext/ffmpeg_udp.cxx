@@ -39,10 +39,10 @@ comPerf perfRep;
 std::string hostname("127.0.0.1");
 uint16_t port_base = 2277;
 sockaddr_in destination;
-int sock;
 #ifdef WIN32
-sockaddr_in local;
-SOCKET s;
+SOCKET destSocket = INVALID_SOCKET;
+#else  // Linux
+int sock;
 #endif
 
 
@@ -58,7 +58,7 @@ void contact_name_to_id(std::string name, std::string &id)
   // get a hash of the name string, convert to BASE64 string
   uint64_t nameHash[2];
   uint32_t hashSeed = 0x0ec3d821;   // no significance to this number, other that it is prime
-  MurmurHash3_x64_128( name.c_str(), name.size(), hashSeed, &nameHash);
+  MurmurHash3_x64_128( name.c_str(), (int)name.size(), hashSeed, &nameHash);
 
   char b64[9];
   for(int i=0 ; i<8 ; i++) {
@@ -103,25 +103,23 @@ int vid_data_sub(dds::sub::DataReader<cctypes::ccBulk> reader)
       perfRep.tStampData.at(2) = (sample.info().extensions().reception_timestamp().to_microsecs() * 1000);
       perfRep.tStampData.at(3) = tRcvApp;
       const size_t size = sample.data().data().size();
-      perfRep.perf_data_new(sample.info().extensions().publication_sequence_number().value(), size,
-                            (16 + sizeof(cctypes::payloadTypesEnum)));
+      perfRep.perf_data_new((uint32_t)sample.info().extensions().publication_sequence_number().value(), (uint32_t)size,
+                            (uint32_t)(16 + sizeof(cctypes::payloadTypesEnum)));
 
 
       // write the data to external FFMPEG via UDP socket
-#ifdef WIN32
-      int bqty = sendto(s, reinterpret_cast<const char*>(sample.data().data().data()),
-          sample.data().data().size(), 0, (sockaddr*)&local, sizeof(local));
-      fprintf(stderr, "DDSrcv: %d bytes\n", bqty);
-
-#else
       uint32_t chunk = 0;
       for (size_t i = 0; i < size;) {
-        if ((size - i) > 188) { chunk = 188; }
-        else { chunk = (size - i); }
-        i += ::sendto(sock, sample.data().data().data() + i, chunk, 0,
+          if ((size - i) > 188) { chunk = 188; }
+          else { chunk = (uint32_t)(size - i); }
+#ifdef WIN32
+          i += sendto(destSocket, reinterpret_cast<const char*>(sample.data().data().data() + i),
+              chunk, 0, (sockaddr*)&destination, sizeof(destination));
+#else
+          i += ::sendto(sock, sample.data().data().data() + i, chunk, 0,
               reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
-      }
 #endif
+      }
       count++;
     } else {
       std::cout << "Instance state changed to "
@@ -178,35 +176,23 @@ void participant_main(application::ApplicationArguments args)
         return;
     }
 
-    SOCKET serverSocket = INVALID_SOCKET;
-    serverSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (serverSocket == INVALID_SOCKET) {
+    destSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (destSocket == INVALID_SOCKET) {
         printf("socket failed with error %d\n", WSAGetLastError());
         return;
     }
 
-    struct sockaddr_in serverAddr;
-    struct sockaddr_in senderAddr;
-    int senderAddrSize = sizeof(senderAddr);
-    short port = 2277;
+    // Bind the socket to the specified address and port.
+    destination.sin_family = AF_INET;
+    destination.sin_port = htons(port_base);
+    destination.sin_addr.s_addr = inet_addr(hostname.c_str());
 
-    // Bind the socket to any address and the specified port.
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(port);
-    // OR, you can do serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serverAddr.sin_addr.s_addr = inet_addr(hostname.c_str());
-
-    if (bind(serverSocket, (SOCKADDR*)&serverAddr, sizeof(serverAddr))) {
+    if (bind(destSocket, (SOCKADDR*)&destination, sizeof(destination))) {
         printf("bind failed with error %d\n", WSAGetLastError());
         return;
     }
-    //WSAData data;
-    //WSAStartup(MAKEWORD(2, 2), &data);
-    //local.sin_family = AF_INET;
-    //inet_pton(AF_INET, hostname.c_str(), &local.sin_addr.S_un);
-    //local.sin_port = htons(port_base);
-    //s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    //bind(s, (sockaddr*)&local, sizeof(local));
+    int destAddrSize = sizeof(destination);
+
 #else
     sock = ::socket(AF_INET, SOCK_DGRAM, 0);
     destination.sin_family = AF_INET;
@@ -219,23 +205,42 @@ void participant_main(application::ApplicationArguments args)
     }
     std::cout << "UDP Connected" << std::endl;
 #endif
-    char tmpBuf[39072];         // set to (max sample size * 2) + 1472
+    char* tmpBuf = (char *)calloc(39072, sizeof(char));
+    if (NULL == tmpBuf) {
+        fprintf(stderr, "Memory Allocation error\n");
+        exit(-1);
+    }
     int32_t tbi = 0;            // tmpBuf index
+    int32_t psync = 0;          // sync index for MPEG-TS packets
+    int32_t sendBufIdx = 0;
+    uint64_t tStart = tstamp_u64_get();
+    uint64_t tDropSum = 0;
+    int32_t tDropCount = 1;
+    int udp_bytes_rcvd = 5000;
+    int checkCount = 100;
     bool new_frame_group = true;
-    while(false == application::shutdown_requested) {
-      // check for any control samples
-      waitset.dispatch(dds::core::Duration(0, 50000));
-      if(ctrlSub.sub_samples_in_queue()) {
-        uint32_t newSize = ctrlSub.oldest_sub_sample().frames_per_sample();
-        fprintf(stderr, "New size: %u\n", newSize);
-        args.pub_data_size = newSize * 188;
-        cnxStream.pub_sample_data_size_set(args.pub_data_size);
-        ctrlSub.pop_oldest_sub_sample();
-      }
 
-#ifdef WIN32      //Receive an incoming message
-      int udp_bytes_rcvd = recvfrom(serverSocket, &tmpBuf[inp], 2048,
-            0, (SOCKADDR*)&senderAddr, &senderAddrSize);
+    while(false == application::shutdown_requested) {
+      // FIXME: rcvfrom() needs to be on a separate thread 
+      // check for any control samples
+        if (udp_bytes_rcvd < 1400) {
+            if (--checkCount == 0) {
+                waitset.dispatch(dds::core::Duration(0, 10000));
+                if (ctrlSub.sub_samples_in_queue()) {
+                    uint32_t newSize = ctrlSub.oldest_sub_sample().frames_per_sample();
+                    fprintf(stderr, "New size: %u\n", newSize);
+                    args.pub_data_size = newSize * 188;
+                    cnxStream.pub_sample_data_size_set(args.pub_data_size);
+                    ctrlSub.pop_oldest_sub_sample();
+                }
+                fprintf(stdout, "CheckCtrl\n");
+                checkCount = 100;
+            }
+        }
+
+#ifdef WIN32      // Receive an incoming message
+      udp_bytes_rcvd = recvfrom(destSocket, &tmpBuf[tbi], 39072,
+            0, (SOCKADDR*)&destination, &destAddrSize);
       if (udp_bytes_rcvd == SOCKET_ERROR) {
             printf("recvfrom failed with error %d\n", WSAGetLastError());
       }
@@ -245,37 +250,77 @@ void participant_main(application::ApplicationArguments args)
         std::cout << "recv failed" << std::endl;
       }
 #endif
-      tbi += udp_bytes_rcvd;
 
-      if(new_frame_group) {
-        cnxStream.pub_sample_tstamp_first_frame();
-        new_frame_group = false;
+      // new implementation
+      // if flag set, get time stamp into sample, clear flag
+      if (new_frame_group) {
+          cnxStream.pub_sample_tstamp_first_frame();
+          new_frame_group = false;
       }
 
-      // send only when we have enough packets for a full sample
-      while(tbi >= args.pub_data_size)
+      tbi += udp_bytes_rcvd;
+      int32_t tmpbuf_bytes = tbi;
+      bool imlost = true;
+
+      while ((psync + 188) < tmpbuf_bytes)
       {
-        // copy from tmpBuf into pub sample
-        cnxStream.pub_sample_data_size_set(args.pub_data_size);
-        memcpy(cnxStream.pub_sample_data(), tmpBuf, args.pub_data_size);
+          if ((tmpBuf[psync] == 0x47) && (tmpBuf[psync + 188] == 0x47))
+          {
+              imlost = false;
+              // this is probably a valid MPEG-TS packet; move it to sendbuf
+              memcpy(cnxStream.pub_sample_data() + sendBufIdx, &tmpBuf[psync], 188);
 
-        // move any excess to the start of tmpBuf
-        memmove(tmpBuf, &tmpBuf[args.pub_data_size], tbi-args.pub_data_size);
+              // update psync and sendBufIdx
+              psync += 188;
+              sendBufIdx += 188;
 
-        // update index
-        tbi -= args.pub_data_size;
+              // if full sample, publish it
+              if (sendBufIdx >= args.pub_data_size)
+              {
+                  new_frame_group = true;
+                  while (false == application::shutdown_requested) {
+                      try {
+                          cnxStream.publish();
+                          sendBufIdx = 0;
+                          break;
+                      }
+                      catch (...) {
+                          std::cerr << "Write operation timed out, retrying..." << std::endl;
+                      }
+                  }
+                  // sendBufIdx = 0;
 
-        // publish
-        new_frame_group = true;
-        while (false == application::shutdown_requested) {
-          try {
-            cnxStream.publish();
-            break;
+                  // if data remains, move to base of tmpBuf
+                  if (psync < tmpbuf_bytes)
+                  {
+                      tbi = tmpbuf_bytes - psync;
+                      memmove(tmpBuf, &tmpBuf[psync], tbi);
+                      psync %= 188;
+                      tmpbuf_bytes = 0;
+                  }
+              }
           }
-          catch (...) {
-            std::cerr << "Write operation timed out, retrying..." << std::endl;
+          else
+          {
+              // find the next packet sync bytes
+              psync++;
+              if (imlost == false) {
+                  uint64_t tNow = tstamp_u64_get();
+                  fprintf(stderr, "SyncLost[%d] after %6.3f mS (%6.3f mS)\n", psync, 
+                      ((float)(tNow-tStart))/1000000.0f,
+                      ((float)tDropSum)/(tDropCount * 1000000.0f)
+                  );
+                  if (tDropSum) {
+                      tDropSum += tNow - tStart;
+                      tDropCount++;
+                  }
+                  else {
+                      tDropSum = 1;
+                  }
+                  tStart = tNow;
+                  imlost = true;
+              }
           }
-        }
       }
     }
   }
@@ -293,31 +338,20 @@ void participant_main(application::ApplicationArguments args)
         return;
     }
 
-    s = INVALID_SOCKET;
-    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (s == INVALID_SOCKET) {
+    destSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (destSocket == INVALID_SOCKET) {
         printf("socket failed with error %d\n", WSAGetLastError());
+        WSACleanup();
         return;
     }
 
     
-    // Bind the socket to any address and the specified port.
-    local.sin_family = AF_INET;
-    local.sin_port = htons(port_base + 1);
-    local.sin_addr.s_addr = inet_addr(hostname.c_str());
+    // set up to send to loopback address and the specified port.
+    destination.sin_family = AF_INET;
+    destination.sin_port = htons(port_base + 1);
+    destination.sin_addr.s_addr = inet_addr(hostname.c_str());
 
-    if (bind(s, (SOCKADDR*)&local, sizeof(local))) {
-        printf("bind failed with error %d\n", WSAGetLastError());
-        return;
-    }
 
-//    WSAData data;
-//    WSAStartup(MAKEWORD(2, 2), &data);
-//    local.sin_family = AF_INET;
-//    inet_pton(AF_INET, hostname.c_str(), &local.sin_addr.S_un);
-//    local.sin_port = htons(port_base + 1);
-//    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-//    bind(s, (sockaddr*)&local, sizeof(local));
 #else
     sock = ::socket(AF_INET, SOCK_DGRAM, 0);
     destination.sin_family = AF_INET;
@@ -356,7 +390,7 @@ void participant_main(application::ApplicationArguments args)
       }
     }
 #ifdef WIN32        // FIXME: move these to outside of pub/sub
-    closesocket(s);
+    closesocket(destSocket);
     WSACleanup();
 #else
     ::close(sock);

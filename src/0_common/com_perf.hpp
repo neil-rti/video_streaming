@@ -116,7 +116,7 @@ public:
         sampleSeqNumberPrevious = seqnum;
 
         // calculate latencies (diffs between tStamps)
-        uint64_t tDelta = tStampData.at(1) - tStampData.at(0);          // pub add to send buffer -to- pub send delay
+        int64_t tDelta = tStampData.at(1) - tStampData.at(0);           // pub add to send buffer -to- pub send delay
         if(tDelta < tLatencyMin.at(0)) tLatencyMin.at(0) = tDelta;
         if(tDelta > tLatencyMax.at(0)) tLatencyMax.at(0) = tDelta;
         tLatencySum.at(0) += tDelta;
