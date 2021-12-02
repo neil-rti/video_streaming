@@ -14,8 +14,7 @@
  **/
 #include <algorithm>
 #include <iostream>
-// #include <fstream>
-// #include <poll.h>                 // stdio polling
+#include <thread>                 // thread for UDP input from ffmpeg(blocking)
 #include <signal.h>               // ctrl-c handler
 #ifdef WIN32
 #include <WinSock2.h>
@@ -39,8 +38,12 @@ comPerf perfRep;
 std::string hostname("127.0.0.1");
 uint16_t port_base = 2277;
 sockaddr_in destination;
+char* tmpBuf;
+const int tmpBufMax = 131072;
 #ifdef WIN32
 SOCKET destSocket = INVALID_SOCKET;
+int inx, outx, rollx;
+uint64_t intot, outtot;
 #else  // Linux
 int sock;
 #endif
@@ -129,6 +132,126 @@ int vid_data_sub(dds::sub::DataReader<cctypes::ccBulk> reader)
   return count;
 }
 
+#if 1   // def WIN32  // try implementing this with stdlib
+/** ----------------------------------------------------------------
+ * winUdpThread()
+ * Use a separate thread for receiving UDP input from FFMPEG
+ **/
+void winUdpThread(void)
+{
+    WSADATA wsaData;
+    int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (res != NO_ERROR) {
+        printf("WSAStartup failed with error %d\n", res);
+        return;
+    }
+
+    destSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (destSocket == INVALID_SOCKET) {
+        printf("socket failed with error %d\n", WSAGetLastError());
+        return;
+    }
+
+    // Bind the socket to the specified address and port.
+    destination.sin_family = AF_INET;
+    destination.sin_port = htons(port_base);
+    destination.sin_addr.s_addr = inet_addr(hostname.c_str());
+
+    if (bind(destSocket, (SOCKADDR*)&destination, sizeof(destination))) {
+        printf("bind failed with error %d\n", WSAGetLastError());
+        return;
+    }
+    int destAddrSize = sizeof(destination);
+    int udp_bytes_rcvd = 0;
+
+    while (false == application::shutdown_requested)
+    {
+        // this call blocks until data is received
+        udp_bytes_rcvd = recvfrom(destSocket, &tmpBuf[inx], 1504,
+            0, (SOCKADDR*)&destination, &destAddrSize);
+        if (udp_bytes_rcvd == SOCKET_ERROR) {
+            printf("recvfrom failed with error %d\n", WSAGetLastError());
+        }
+        intot += udp_bytes_rcvd;
+        inx += udp_bytes_rcvd;
+
+        if (inx > rollx) rollx = inx;
+
+        // wrap the buffer when approaching the end,
+        // or if in the upper half and had just gotten a short chunk
+        // (this should help to align tmpBuf with the MPEG-TS packets)
+        if (((inx > (tmpBufMax / 2)) && (udp_bytes_rcvd < 1472))
+            || ((inx + 1472) >= tmpBufMax))
+        {
+            rollx = inx;
+            inx = 0;
+        }
+    }
+    return;
+}
+
+#else   // this is the windows-specific implementation
+/** ----------------------------------------------------------------
+ * winUdpThread()
+ * Use a separate thread for receiving UDP input from FFMPEG
+ **/
+DWORD WINAPI winUdpThread(LPVOID lpParameter)
+{
+    // data buffer is passed as arg
+    char *tmpBuf = (char *)lpParameter;
+
+    WSADATA wsaData;
+    int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (res != NO_ERROR) {
+        printf("WSAStartup failed with error %d\n", res);
+        return -1;
+    }
+
+    destSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (destSocket == INVALID_SOCKET) {
+        printf("socket failed with error %d\n", WSAGetLastError());
+        return -1;
+    }
+
+    // Bind the socket to the specified address and port.
+    destination.sin_family = AF_INET;
+    destination.sin_port = htons(port_base);
+    destination.sin_addr.s_addr = inet_addr(hostname.c_str());
+
+    if (bind(destSocket, (SOCKADDR*)&destination, sizeof(destination))) {
+        printf("bind failed with error %d\n", WSAGetLastError());
+        return -1;
+    }
+    int destAddrSize = sizeof(destination);
+    int udp_bytes_rcvd = 0;
+
+    while (false == application::shutdown_requested)
+    {
+        // this call blocks until data is received
+        udp_bytes_rcvd = recvfrom(destSocket, &tmpBuf[inx], 1504,
+            0, (SOCKADDR*)&destination, &destAddrSize);
+        if (udp_bytes_rcvd == SOCKET_ERROR) {
+            printf("recvfrom failed with error %d\n", WSAGetLastError());
+        }
+        intot += udp_bytes_rcvd;
+        inx += udp_bytes_rcvd;
+
+        if (inx > rollx) rollx = inx;
+
+        // wrap the buffer when approaching the end,
+        // or if in the upper half and had just gotten a short chunk
+        // (this should help to align tmpBuf with the MPEG-TS packets)
+        if(((inx > (tmpBufMax/2)) && (udp_bytes_rcvd < 1472))
+            || ((inx+1472) >= tmpBufMax))
+        {
+            rollx = inx;
+            inx = 0;
+        }
+    }
+    return 0;
+}
+#endif
+
 
 /** ----------------------------------------------------------------
  * participant_main()
@@ -168,6 +291,7 @@ void participant_main(application::ApplicationArguments args)
     cnxStream.pub_sample_content_type_set(cctypes::payloadTypesEnum::STREAM_FFMPEG_0);
     rtiComPubCtrl ctrlSub(std::string("c" + myId), CTRL_SUB_BE, participant, &waitset);
 
+#if 0
 #ifdef WIN32    // open a UDP socket to FFMPEG
     WSADATA wsaData;
     int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
@@ -205,11 +329,81 @@ void participant_main(application::ApplicationArguments args)
     }
     std::cout << "UDP Connected" << std::endl;
 #endif
-    char* tmpBuf = (char *)calloc(39072, sizeof(char));
+#endif
+    tmpBuf = (char *)calloc(tmpBufMax, sizeof(char));
     if (NULL == tmpBuf) {
         fprintf(stderr, "Memory Allocation error\n");
         exit(-1);
     }
+
+#ifdef WIN32
+    inx = outx = 0;
+    rollx = tmpBufMax;
+    intot = outtot = 0;
+
+    // launch thread for udp input from FFMPEG
+    std::thread thudp(winUdpThread);
+    thudp.detach();
+
+    //DWORD myThreadID;
+    //HANDLE myHandle = CreateThread(0, 0, winUdpThread, tmpBuf, 0, &myThreadID);
+    bool new_frame_group = true;
+    int sendBufIdx = 0;
+    volatile int checkForControl = 500000000;
+    int loopcount = 0;
+
+    while (false == application::shutdown_requested) {
+        //rti::util::sleep(dds::core::Duration(0, 10000));
+        // debug
+        if((intot-outtot) > args.pub_data_size)
+        {
+            // skip the alignment for now -- just pack and ship
+            // fprintf(stdout, "iotot: %llu %llu, %d %d %d\n", intot, outtot, inx, outx, rollx);
+            if ((outx + args.pub_data_size) <= rollx)
+            {
+                memcpy(cnxStream.pub_sample_data(), &tmpBuf[outx], args.pub_data_size);
+                outx += args.pub_data_size;
+            }
+            else {
+                memcpy(cnxStream.pub_sample_data(), &tmpBuf[outx], rollx-outx);
+                memcpy(cnxStream.pub_sample_data() + (rollx-outx), &tmpBuf[0], args.pub_data_size - (rollx - outx));
+                outx = args.pub_data_size - (rollx - outx);
+            }
+            outtot += args.pub_data_size;
+            // new_frame_group = true;
+            while (false == application::shutdown_requested) {
+                try {
+                    cnxStream.publish();
+                    sendBufIdx = 0;
+                    break;
+                }
+                catch (...) {
+                    std::cerr << "Write operation timed out, retrying..." << std::endl;
+                }
+            }
+            cnxStream.pub_sample_tstamp_first_frame();
+        }
+
+        // check for any control samples
+#if 1
+        if (--checkForControl <= 0)
+        {
+            waitset.dispatch(dds::core::Duration(0, 20000));
+            if (ctrlSub.sub_samples_in_queue()) {
+                uint32_t newSize = ctrlSub.oldest_sub_sample().frames_per_sample();
+                fprintf(stderr, "New size: %u\n", newSize);
+                args.pub_data_size = newSize * 188;
+                cnxStream.pub_sample_data_size_set(args.pub_data_size);
+                ctrlSub.pop_oldest_sub_sample();
+            }
+            checkForControl = 500000000;
+            fprintf(stdout, "Check %d\n", ++loopcount);
+        }
+#endif    
+
+
+#endif
+#if 0
     int32_t tbi = 0;            // tmpBuf index
     int32_t psync = 0;          // sync index for MPEG-TS packets
     int32_t sendBufIdx = 0;
@@ -237,7 +431,8 @@ void participant_main(application::ApplicationArguments args)
                 checkCount = 100;
             }
         }
-
+#endif
+#if 0
 #ifdef WIN32      // Receive an incoming message
       udp_bytes_rcvd = recvfrom(destSocket, &tmpBuf[tbi], 39072,
             0, (SOCKADDR*)&destination, &destAddrSize);
@@ -250,7 +445,8 @@ void participant_main(application::ApplicationArguments args)
         std::cout << "recv failed" << std::endl;
       }
 #endif
-
+#endif
+#if 0
       // new implementation
       // if flag set, get time stamp into sample, clear flag
       if (new_frame_group) {
@@ -322,6 +518,7 @@ void participant_main(application::ApplicationArguments args)
               }
           }
       }
+#endif
     }
   }
   else {  // subscriber
