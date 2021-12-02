@@ -132,13 +132,13 @@ int vid_data_sub(dds::sub::DataReader<cctypes::ccBulk> reader)
   return count;
 }
 
-#if 1   // def WIN32  // try implementing this with stdlib
 /** ----------------------------------------------------------------
- * winUdpThread()
+ * udpInputThread()
  * Use a separate thread for receiving UDP input from FFMPEG
  **/
-void winUdpThread(void)
+void udpInputThread(void)
 {
+#ifdef WIN32
     WSADATA wsaData;
     int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (res != NO_ERROR) {
@@ -162,16 +162,35 @@ void winUdpThread(void)
         return;
     }
     int destAddrSize = sizeof(destination);
+#else   // Linux
+    sock = ::socket(AF_INET, SOCK_DGRAM, 0);
+    destination.sin_family = AF_INET;
+    destination.sin_port = htons(port_base);
+    destination.sin_addr.s_addr = inet_addr(hostname.c_str());
+
+    //checks connection
+    if (bind(sock, (struct sockaddr*)&destination, sizeof(destination)) < 0) {
+        std::cout << "UDP Connection error" << std::endl;
+    }
+
+#endif
     int udp_bytes_rcvd = 0;
 
     while (false == application::shutdown_requested)
     {
         // this call blocks until data is received
+#ifdef WIN32
         udp_bytes_rcvd = recvfrom(destSocket, &tmpBuf[inx], 1504,
             0, (SOCKADDR*)&destination, &destAddrSize);
         if (udp_bytes_rcvd == SOCKET_ERROR) {
             printf("recvfrom failed with error %d\n", WSAGetLastError());
         }
+#else   // Linux
+        int udp_bytes_rcvd = recv(sock, &tmpBuf[tbi], 2048, 0);
+        if (udp_bytes_rcvd < 0) {
+            std::cout << "recv failed" << std::endl;
+        }
+#endif
         intot += udp_bytes_rcvd;
         inx += udp_bytes_rcvd;
 
@@ -189,68 +208,6 @@ void winUdpThread(void)
     }
     return;
 }
-
-#else   // this is the windows-specific implementation
-/** ----------------------------------------------------------------
- * winUdpThread()
- * Use a separate thread for receiving UDP input from FFMPEG
- **/
-DWORD WINAPI winUdpThread(LPVOID lpParameter)
-{
-    // data buffer is passed as arg
-    char *tmpBuf = (char *)lpParameter;
-
-    WSADATA wsaData;
-    int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (res != NO_ERROR) {
-        printf("WSAStartup failed with error %d\n", res);
-        return -1;
-    }
-
-    destSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (destSocket == INVALID_SOCKET) {
-        printf("socket failed with error %d\n", WSAGetLastError());
-        return -1;
-    }
-
-    // Bind the socket to the specified address and port.
-    destination.sin_family = AF_INET;
-    destination.sin_port = htons(port_base);
-    destination.sin_addr.s_addr = inet_addr(hostname.c_str());
-
-    if (bind(destSocket, (SOCKADDR*)&destination, sizeof(destination))) {
-        printf("bind failed with error %d\n", WSAGetLastError());
-        return -1;
-    }
-    int destAddrSize = sizeof(destination);
-    int udp_bytes_rcvd = 0;
-
-    while (false == application::shutdown_requested)
-    {
-        // this call blocks until data is received
-        udp_bytes_rcvd = recvfrom(destSocket, &tmpBuf[inx], 1504,
-            0, (SOCKADDR*)&destination, &destAddrSize);
-        if (udp_bytes_rcvd == SOCKET_ERROR) {
-            printf("recvfrom failed with error %d\n", WSAGetLastError());
-        }
-        intot += udp_bytes_rcvd;
-        inx += udp_bytes_rcvd;
-
-        if (inx > rollx) rollx = inx;
-
-        // wrap the buffer when approaching the end,
-        // or if in the upper half and had just gotten a short chunk
-        // (this should help to align tmpBuf with the MPEG-TS packets)
-        if(((inx > (tmpBufMax/2)) && (udp_bytes_rcvd < 1472))
-            || ((inx+1472) >= tmpBufMax))
-        {
-            rollx = inx;
-            inx = 0;
-        }
-    }
-    return 0;
-}
-#endif
 
 
 /** ----------------------------------------------------------------
@@ -336,17 +293,14 @@ void participant_main(application::ApplicationArguments args)
         exit(-1);
     }
 
-#ifdef WIN32
     inx = outx = 0;
     rollx = tmpBufMax;
     intot = outtot = 0;
 
     // launch thread for udp input from FFMPEG
-    std::thread thudp(winUdpThread);
-    thudp.detach();
+    std::thread thrudp(udpInputThread);
+    thrudp.detach();
 
-    //DWORD myThreadID;
-    //HANDLE myHandle = CreateThread(0, 0, winUdpThread, tmpBuf, 0, &myThreadID);
     bool new_frame_group = true;
     int sendBufIdx = 0;
     volatile int checkForControl = 500000000;
@@ -358,8 +312,7 @@ void participant_main(application::ApplicationArguments args)
         if((intot-outtot) > args.pub_data_size)
         {
             // skip the alignment for now -- just pack and ship
-            // fprintf(stdout, "iotot: %llu %llu, %d %d %d\n", intot, outtot, inx, outx, rollx);
-            if ((outx + args.pub_data_size) <= rollx)
+            if ((outx + (int)args.pub_data_size) <= rollx)
             {
                 memcpy(cnxStream.pub_sample_data(), &tmpBuf[outx], args.pub_data_size);
                 outx += args.pub_data_size;
@@ -385,7 +338,6 @@ void participant_main(application::ApplicationArguments args)
         }
 
         // check for any control samples
-#if 1
         if (--checkForControl <= 0)
         {
             waitset.dispatch(dds::core::Duration(0, 20000));
@@ -399,126 +351,6 @@ void participant_main(application::ApplicationArguments args)
             checkForControl = 500000000;
             fprintf(stdout, "Check %d\n", ++loopcount);
         }
-#endif    
-
-
-#endif
-#if 0
-    int32_t tbi = 0;            // tmpBuf index
-    int32_t psync = 0;          // sync index for MPEG-TS packets
-    int32_t sendBufIdx = 0;
-    uint64_t tStart = tstamp_u64_get();
-    uint64_t tDropSum = 0;
-    int32_t tDropCount = 1;
-    int udp_bytes_rcvd = 5000;
-    int checkCount = 100;
-    bool new_frame_group = true;
-
-    while(false == application::shutdown_requested) {
-      // FIXME: rcvfrom() needs to be on a separate thread 
-      // check for any control samples
-        if (udp_bytes_rcvd < 1400) {
-            if (--checkCount == 0) {
-                waitset.dispatch(dds::core::Duration(0, 10000));
-                if (ctrlSub.sub_samples_in_queue()) {
-                    uint32_t newSize = ctrlSub.oldest_sub_sample().frames_per_sample();
-                    fprintf(stderr, "New size: %u\n", newSize);
-                    args.pub_data_size = newSize * 188;
-                    cnxStream.pub_sample_data_size_set(args.pub_data_size);
-                    ctrlSub.pop_oldest_sub_sample();
-                }
-                fprintf(stdout, "CheckCtrl\n");
-                checkCount = 100;
-            }
-        }
-#endif
-#if 0
-#ifdef WIN32      // Receive an incoming message
-      udp_bytes_rcvd = recvfrom(destSocket, &tmpBuf[tbi], 39072,
-            0, (SOCKADDR*)&destination, &destAddrSize);
-      if (udp_bytes_rcvd == SOCKET_ERROR) {
-            printf("recvfrom failed with error %d\n", WSAGetLastError());
-      }
-#else   // Linux
-      int udp_bytes_rcvd = recv(sock, &tmpBuf[tbi], 2048, 0);
-      if( udp_bytes_rcvd < 0) {      
-        std::cout << "recv failed" << std::endl;
-      }
-#endif
-#endif
-#if 0
-      // new implementation
-      // if flag set, get time stamp into sample, clear flag
-      if (new_frame_group) {
-          cnxStream.pub_sample_tstamp_first_frame();
-          new_frame_group = false;
-      }
-
-      tbi += udp_bytes_rcvd;
-      int32_t tmpbuf_bytes = tbi;
-      bool imlost = true;
-
-      while ((psync + 188) < tmpbuf_bytes)
-      {
-          if ((tmpBuf[psync] == 0x47) && (tmpBuf[psync + 188] == 0x47))
-          {
-              imlost = false;
-              // this is probably a valid MPEG-TS packet; move it to sendbuf
-              memcpy(cnxStream.pub_sample_data() + sendBufIdx, &tmpBuf[psync], 188);
-
-              // update psync and sendBufIdx
-              psync += 188;
-              sendBufIdx += 188;
-
-              // if full sample, publish it
-              if (sendBufIdx >= args.pub_data_size)
-              {
-                  new_frame_group = true;
-                  while (false == application::shutdown_requested) {
-                      try {
-                          cnxStream.publish();
-                          sendBufIdx = 0;
-                          break;
-                      }
-                      catch (...) {
-                          std::cerr << "Write operation timed out, retrying..." << std::endl;
-                      }
-                  }
-                  // sendBufIdx = 0;
-
-                  // if data remains, move to base of tmpBuf
-                  if (psync < tmpbuf_bytes)
-                  {
-                      tbi = tmpbuf_bytes - psync;
-                      memmove(tmpBuf, &tmpBuf[psync], tbi);
-                      psync %= 188;
-                      tmpbuf_bytes = 0;
-                  }
-              }
-          }
-          else
-          {
-              // find the next packet sync bytes
-              psync++;
-              if (imlost == false) {
-                  uint64_t tNow = tstamp_u64_get();
-                  fprintf(stderr, "SyncLost[%d] after %6.3f mS (%6.3f mS)\n", psync, 
-                      ((float)(tNow-tStart))/1000000.0f,
-                      ((float)tDropSum)/(tDropCount * 1000000.0f)
-                  );
-                  if (tDropSum) {
-                      tDropSum += tNow - tStart;
-                      tDropCount++;
-                  }
-                  else {
-                      tDropSum = 1;
-                  }
-                  tStart = tNow;
-                  imlost = true;
-              }
-          }
-      }
-#endif
     }
   }
   else {  // subscriber
