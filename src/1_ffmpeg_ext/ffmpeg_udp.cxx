@@ -40,10 +40,11 @@ uint16_t port_base = 2277;
 sockaddr_in destination;
 char* tmpBuf;
 const int tmpBufMax = 131072;
-#ifdef WIN32
-SOCKET destSocket = INVALID_SOCKET;
 int inx, outx, rollx;
 uint64_t intot, outtot;
+
+#ifdef WIN32
+SOCKET destSocket = INVALID_SOCKET;
 #else  // Linux
 int sock;
 #endif
@@ -186,7 +187,7 @@ void udpInputThread(void)
             printf("recvfrom failed with error %d\n", WSAGetLastError());
         }
 #else   // Linux
-        int udp_bytes_rcvd = recv(sock, &tmpBuf[tbi], 2048, 0);
+        int udp_bytes_rcvd = recv(sock, &tmpBuf[inx], 2048, 0);
         if (udp_bytes_rcvd < 0) {
             std::cout << "recv failed" << std::endl;
         }
