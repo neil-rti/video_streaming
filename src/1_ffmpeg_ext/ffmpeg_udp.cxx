@@ -15,6 +15,8 @@
 #include <algorithm>
 #include <iostream>
 #include <thread>                 // thread for UDP input from ffmpeg(blocking)
+#include <mutex>
+#include <condition_variable>
 #include <signal.h>               // ctrl-c handler
 #ifdef WIN32
 #include <WinSock2.h>
@@ -42,6 +44,9 @@ char* tmpBuf;
 const int tmpBufMax = 131072;
 int inx, outx, rollx;
 uint64_t intot, outtot;
+
+std::condition_variable cv;
+std::mutex mtx;
 
 #ifdef WIN32
 SOCKET destSocket = INVALID_SOCKET;
@@ -194,18 +199,21 @@ void udpInputThread(void)
 #endif
         intot += udp_bytes_rcvd;
         inx += udp_bytes_rcvd;
-
         if (inx > rollx) rollx = inx;
 
-        // wrap the buffer when approaching the end,
-        // or if in the upper half and had just gotten a short chunk
-        // (this should help to align tmpBuf with the MPEG-TS packets)
+        // wrap the buffer if close to end, or if just received
+        // a chunk of data < 1472 bytes, as these tend to be aligned
+        // to the MPEG-TS packets
         if (((inx > (tmpBufMax / 2)) && (udp_bytes_rcvd < 1472))
             || ((inx + 1472) >= tmpBufMax))
         {
             rollx = inx;
             inx = 0;
         }
+
+        // notify pub loop: there is data to send
+        std::lock_guard<std::mutex> lk(mtx);
+        cv.notify_one();
     }
     return;
 }
@@ -224,7 +232,6 @@ void participant_main(application::ApplicationArguments args)
   fprintf(stderr, "myId:  [%s], myName:  '%s'\n", myId.c_str(), args.near_name.c_str());
   fprintf(stderr, "%s\n", args.pub_else_sub ? "publishing to" : "subcribing to");
   fprintf(stderr, "FarID: [%s], FarName: '%s'\n", farId.c_str(), args.far_name.c_str());
-//  fprintf(stderr, "on topic %s\n", args.topic_name.c_str());
 
   // Create a DomainParticipant with default Qos
   dds::domain::DomainParticipant participant(args.domain_id);
@@ -249,45 +256,6 @@ void participant_main(application::ApplicationArguments args)
     cnxStream.pub_sample_content_type_set(cctypes::payloadTypesEnum::STREAM_FFMPEG_0);
     rtiComPubCtrl ctrlSub(std::string("c" + myId), CTRL_SUB_BE, participant, &waitset);
 
-#if 0
-#ifdef WIN32    // open a UDP socket to FFMPEG
-    WSADATA wsaData;
-    int res = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (res != NO_ERROR) {
-        printf("WSAStartup failed with error %d\n", res);
-        return;
-    }
-
-    destSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (destSocket == INVALID_SOCKET) {
-        printf("socket failed with error %d\n", WSAGetLastError());
-        return;
-    }
-
-    // Bind the socket to the specified address and port.
-    destination.sin_family = AF_INET;
-    destination.sin_port = htons(port_base);
-    destination.sin_addr.s_addr = inet_addr(hostname.c_str());
-
-    if (bind(destSocket, (SOCKADDR*)&destination, sizeof(destination))) {
-        printf("bind failed with error %d\n", WSAGetLastError());
-        return;
-    }
-    int destAddrSize = sizeof(destination);
-
-#else
-    sock = ::socket(AF_INET, SOCK_DGRAM, 0);
-    destination.sin_family = AF_INET;
-    destination.sin_port = htons(port_base);
-    destination.sin_addr.s_addr = inet_addr(hostname.c_str());
-
-    //checks connection
-    if (bind(sock, (struct sockaddr *)&destination, sizeof(destination)) < 0) {
-      std::cout << "UDP Connection error" << std::endl;
-    }
-    std::cout << "UDP Connected" << std::endl;
-#endif
-#endif
     tmpBuf = (char *)calloc(tmpBufMax, sizeof(char));
     if (NULL == tmpBuf) {
         fprintf(stderr, "Memory Allocation error\n");
@@ -302,15 +270,23 @@ void participant_main(application::ApplicationArguments args)
     std::thread thrudp(udpInputThread);
     thrudp.detach();
 
-    bool new_frame_group = true;
-    int sendBufIdx = 0;
-    volatile int checkForControl = 500000000;
-    int loopcount = 0;
-
+    // debug
+    uint64_t tStart = tstamp_u64_get();
+    uint64_t tCtrlCheck = tStart;
+    
+    // publish loop
     while (false == application::shutdown_requested) {
-        //rti::util::sleep(dds::core::Duration(0, 10000));
+        // Wait (block) until there's data to send (from UDP input thread)
+        std::unique_lock<std::mutex> lk(mtx);
+        cv.wait(lk);
+
         // debug
-        if((intot-outtot) > args.pub_data_size)
+        uint64_t tWait = tstamp_u64_get();
+        uint32_t pubCount = 0;
+        uint64_t startBytes = intot-outtot;
+
+        //  publish all available data as DDS samples
+        while((intot-outtot) > args.pub_data_size)
         {
             // skip the alignment for now -- just pack and ship
             if ((outx + (int)args.pub_data_size) <= rollx)
@@ -324,11 +300,11 @@ void participant_main(application::ApplicationArguments args)
                 outx = args.pub_data_size - (rollx - outx);
             }
             outtot += args.pub_data_size;
-            // new_frame_group = true;
+            // publish
             while (false == application::shutdown_requested) {
                 try {
                     cnxStream.publish();
-                    sendBufIdx = 0;
+                    pubCount++;
                     break;
                 }
                 catch (...) {
@@ -337,20 +313,31 @@ void participant_main(application::ApplicationArguments args)
             }
             cnxStream.pub_sample_tstamp_first_frame();
         }
+        // debug
+        uint64_t tEnd = tstamp_u64_get();
+#if 0        
+        fprintf(stdout, "%5u samples in %6.3f mS after %6.3f mS wait, %lu --> %lu bytesToSend\n", pubCount, 
+          ((float)(tEnd - tWait)) / 1000000.0f,
+          ((float)(tWait - tStart)) / 1000000.0f,
+          startBytes,
+          intot-outtot
+        );
+#endif
+        tStart = tEnd;
 
-        // check for any control samples
-        if (--checkForControl <= 0)
+
+        // check for any control samples, once per second
+        if((tEnd - tCtrlCheck) > 1000000000)
         {
-            waitset.dispatch(dds::core::Duration(0, 20000));
-            if (ctrlSub.sub_samples_in_queue()) {
-                uint32_t newSize = ctrlSub.oldest_sub_sample().frames_per_sample();
-                fprintf(stderr, "New size: %u\n", newSize);
-                args.pub_data_size = newSize * 188;
-                cnxStream.pub_sample_data_size_set(args.pub_data_size);
-                ctrlSub.pop_oldest_sub_sample();
-            }
-            checkForControl = 500000000;
-            fprintf(stdout, "Check %d\n", ++loopcount);
+          tCtrlCheck = tEnd;
+          waitset.dispatch(dds::core::Duration(0, 200000));
+          if (ctrlSub.sub_samples_in_queue()) {
+            uint32_t newSize = ctrlSub.oldest_sub_sample().frames_per_sample();
+            fprintf(stderr, "New size: %u\n", newSize);
+            args.pub_data_size = newSize * 188;
+            cnxStream.pub_sample_data_size_set(args.pub_data_size);
+            ctrlSub.pop_oldest_sub_sample();
+          }
         }
     }
   }
