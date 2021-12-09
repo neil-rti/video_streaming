@@ -33,27 +33,27 @@ class comPerf
 
 
 public:
-    // comPerf() // FIXME: build constructors
-    comPerf() : tStampData(4), latencyMin(4), latencyMax(4), latencyMean(4), latencyStdDev(4) 
+    comPerf() : tStampData(4), latencyMin(3), latencyMax(3), latencyMean(3), latencyStdDev(3), tStampLast(4)
     {
         latencyMin = { -99999999999 };  // minimum latency in this interval
         latencyMax = { 0 };             // maximum latency in this interval
         latencyMean = { 0 };            // sums of latencies in this interval
         latencyStdDev = { 0 };          // standard deviation of latencies in this interval
+        tStampLast = { 0 };             // last-measured timestamps before measurement sendoff
         samplesInInterval = 0;          // number of samples in measurement period
         dataSumInInterval = 0;          // total bytes sent in period
         intervalActualStart = 0;        // actual start timestamp
         intervalActualDuration = 0;     // actual duration of test interval (nSec)
         dropCount = 0;                  // total samples dropped
         framesPerSample = 0;
-        tStampPrevious.resize(4);
-        tLatencyMin.resize(4);
-        tLatencyMax.resize(4);
-        tLatencySum.resize(4);
-        latencyMin.resize(4);
-        latencyMax.resize(4);
-        latencyMean.resize(4);
-        latencyStdDev.resize(4);
+        tLatencyMin.resize(3);
+        tLatencyMax.resize(3);
+        tLatencySum.resize(3);
+        latencyMin.resize(3);
+        latencyMax.resize(3);
+        latencyMean.resize(3);
+        latencyStdDev.resize(3);
+        tStampLast.resize(4);
         perf_data_ready = false;
     }
 
@@ -64,6 +64,7 @@ public:
     std::vector<int64_t> latencyMax;        // maximum latency in this interval
     std::vector<int64_t> latencyMean;       // sums of latencies in this interval
     std::vector<uint64_t> latencyStdDev;    // standard deviation of latencies in this interval
+    std::vector<uint64_t> tStampLast;       // most-recent timestamps in the signal chain
     uint32_t samplesInInterval;             // number of samples in measurement period
     uint64_t dataSumInInterval;             // total bytes sent in period
     uint64_t intervalActualStart;           // start timestamp of this interval
@@ -89,6 +90,10 @@ public:
                     latencyMean.at(i) = tLatencySum.at(i) / intervalSampleCount;
                     latencyStdDev.at(i) = 0;
                 }
+                tStampLast = tStampData;
+//                for (int i = 0; i < 4; i++) {
+//                    tStampLast.at(i) = tStampData.at(i);
+//                }
                 samplesInInterval = intervalSampleCount;
                 dataSumInInterval = intervalDataSum;
                 intervalActualDuration = tStampData.at(tQty-1) - intervalStartTime;
@@ -116,38 +121,32 @@ public:
         sampleSeqNumberPrevious = seqnum;
 
         // calculate latencies (diffs between tStamps)
-        int64_t tDelta = tStampData.at(1) - tStampData.at(0);           // pub add to send buffer -to- pub send delay
+        int64_t tDelta = tStampData.at(1) - tStampData.at(0);           // PQ: pub add to send buffer -to- pub send delay
         if(tDelta < tLatencyMin.at(0)) tLatencyMin.at(0) = tDelta;
         if(tDelta > tLatencyMax.at(0)) tLatencyMax.at(0) = tDelta;
         tLatencySum.at(0) += tDelta;
         
-        tDelta = tStampData.at(2) - tStampData.at(1);                   // pub send -to- sub receive delay
+        tDelta = tStampData.at(2) - tStampData.at(1);                   // TL1: pub send -to- sub receive delay
         if(tDelta < tLatencyMin.at(1)) tLatencyMin.at(1) = tDelta;
         if(tDelta > tLatencyMax.at(1)) tLatencyMax.at(1) = tDelta;
         tLatencySum.at(1) += tDelta;
 
-        tDelta = tStampData.at(3) - tStampData.at(2);                   // sub receive -to- sub app delay
+        tDelta = tStampData.at(3) - tStampData.at(2);                   // SQ: sub receive -to- sub app delay
         if(tDelta < tLatencyMin.at(2)) tLatencyMin.at(2) = tDelta;
         if(tDelta > tLatencyMax.at(2)) tLatencyMax.at(2) = tDelta;
         tLatencySum.at(2) += tDelta;
-
-        tDelta = tStampData.at(3) - tStampPrevious.at(3);               // previous sample sub app -to- this sample sub app
-        if(tDelta < tLatencyMin.at(3)) tLatencyMin.at(3) = tDelta;
-        if(tDelta > tLatencyMax.at(3)) tLatencyMax.at(3) = tDelta;
-        tLatencySum.at(3) += tDelta;
 
         // add to totals
         totalSampleCount++;
         intervalSampleCount++;
         totalDataSum += (datasize + dataoverhead);
         intervalDataSum += (datasize + dataoverhead);
-        tStampPrevious = tStampData;
     }
 
 
 private:
     // internal
-    int tQty = 4;       // FIXME
+    int tQty = 3;       // FIXME
     // interval stats
     uint64_t intervalDuration;              // duration of the testing/reporting interval
     uint64_t intervalStartTime;             // start time (nSec) of test interval
@@ -155,7 +154,6 @@ private:
     uint32_t intervalSampleCount;           // number of samples in measurement period
     uint64_t intervalDataSum;               // total bytes sent in period
     uint32_t sampleSeqNumberPrevious;       // previous sample sequence number
-    std::vector<uint64_t> tStampPrevious;   // previous timestamps from the application
     std::vector<int64_t> tLatencyMin;      // minimum latency in this interval
     std::vector<int64_t> tLatencyMax;      // maximum latency in this interval
     std::vector<int64_t> tLatencySum;      // sums of latencies in this interval

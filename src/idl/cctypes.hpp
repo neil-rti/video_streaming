@@ -10,8 +10,8 @@ For more information, type 'rtiddsgen -help' at a command shell
 or consult the Code Generator User's Manual.
 */
 
-#ifndef cctypes_751230475_hpp
-#define cctypes_751230475_hpp
+#ifndef cctypes_751230169_hpp
+#define cctypes_751230169_hpp
 
 #include <iosfwd>
 
@@ -64,22 +64,7 @@ namespace cctypes {
     static const uint8_t KEY_STRING_LEN = 8;
     enum class payloadTypesEnum {
         NO_PAYLOAD = 0, 
-        TOP_INFO_EXCHANGE, 
         STREAM_FFMPEG_0, 
-        STREAM_FFMPEG_1, 
-        STREAM_GSTREAMER_0, 
-        STREAM_GSTREAMER_1, 
-        STREAM_OPENCV_0, 
-        STREAM_OPENCV_1, 
-        FILE_TRANSFER_REQUEST, 
-        FILE_TRANSFER_ACCEPT, 
-        FILE_TRANSFER_PAYLOAD, 
-        FILE_TRANSFER_VERIFY, 
-        TEXT_CHAT_0, 
-        TEST_PATTERN_0, 
-        TRAFFIC_GEN_COMPRESSIBLE, 
-        TRAFFIC_GEN_NONCOMPRESSIBLE, 
-        IMAGE_FILE, 
         MAX_PAYLOAD_ENUM
     };
 
@@ -96,8 +81,8 @@ namespace cctypes {
         ccBulk();
 
         ccBulk(
-            const cctypes::payloadTypesEnum& content_type,
             const std::string& pub_id,
+            const cctypes::payloadTypesEnum& content_type,
             uint64_t tstamp_first_frame,
             const ::rti::core::bounded_sequence< uint8_t, (cctypes::MAX_SEQUENCE_LEN) >& data);
 
@@ -113,21 +98,6 @@ namespace cctypes {
         #endif
         #endif 
 
-        cctypes::payloadTypesEnum& content_type() OMG_NOEXCEPT {
-            return m_content_type_;
-        }
-
-        const cctypes::payloadTypesEnum& content_type() const OMG_NOEXCEPT {
-            return m_content_type_;
-        }
-
-        void content_type(const cctypes::payloadTypesEnum& value) {
-            m_content_type_ = value;
-        }
-
-        void content_type(cctypes::payloadTypesEnum&& value) {
-            m_content_type_ = std::move(value);
-        }
         std::string& pub_id() OMG_NOEXCEPT {
             return m_pub_id_;
         }
@@ -142,6 +112,21 @@ namespace cctypes {
 
         void pub_id(std::string&& value) {
             m_pub_id_ = std::move(value);
+        }
+        cctypes::payloadTypesEnum& content_type() OMG_NOEXCEPT {
+            return m_content_type_;
+        }
+
+        const cctypes::payloadTypesEnum& content_type() const OMG_NOEXCEPT {
+            return m_content_type_;
+        }
+
+        void content_type(const cctypes::payloadTypesEnum& value) {
+            m_content_type_ = value;
+        }
+
+        void content_type(cctypes::payloadTypesEnum&& value) {
+            m_content_type_ = std::move(value);
         }
         uint64_t& tstamp_first_frame() OMG_NOEXCEPT {
             return m_tstamp_first_frame_;
@@ -178,8 +163,8 @@ namespace cctypes {
 
       private:
 
-        cctypes::payloadTypesEnum m_content_type_;
         std::string m_pub_id_;
+        cctypes::payloadTypesEnum m_content_type_;
         uint64_t m_tstamp_first_frame_;
         ::rti::core::bounded_sequence< uint8_t, (cctypes::MAX_SEQUENCE_LEN) > m_data_;
 
@@ -208,13 +193,14 @@ namespace cctypes {
             uint64_t tStart,
             uint64_t tDuration,
             uint64_t data_count,
-            uint32_t frames_per_sample,
+            uint32_t packets_per_sample,
             uint32_t samples_count,
             uint32_t samples_dropped,
-            const ::rti::core::bounded_sequence< int64_t, 4L >& latency_min,
-            const ::rti::core::bounded_sequence< int64_t, 4L >& latency_mean,
-            const ::rti::core::bounded_sequence< int64_t, 4L >& latency_max,
-            const ::rti::core::bounded_sequence< uint64_t, 4L >& latency_stddev);
+            const ::rti::core::bounded_sequence< int64_t, 3L >& latency_min,
+            const ::rti::core::bounded_sequence< int64_t, 3L >& latency_mean,
+            const ::rti::core::bounded_sequence< int64_t, 3L >& latency_max,
+            const ::rti::core::bounded_sequence< uint64_t, 3L >& latency_stddev,
+            const ::rti::core::bounded_sequence< uint64_t, 4L >& timestamps_last);
 
         #ifdef RTI_CXX11_RVALUE_REFERENCES
         #ifndef RTI_CXX11_NO_IMPLICIT_MOVE_OPERATIONS
@@ -264,16 +250,16 @@ namespace cctypes {
             m_data_count_ = value;
         }
 
-        uint32_t& frames_per_sample() OMG_NOEXCEPT {
-            return m_frames_per_sample_;
+        uint32_t& packets_per_sample() OMG_NOEXCEPT {
+            return m_packets_per_sample_;
         }
 
-        const uint32_t& frames_per_sample() const OMG_NOEXCEPT {
-            return m_frames_per_sample_;
+        const uint32_t& packets_per_sample() const OMG_NOEXCEPT {
+            return m_packets_per_sample_;
         }
 
-        void frames_per_sample(uint32_t value) {
-            m_frames_per_sample_ = value;
+        void packets_per_sample(uint32_t value) {
+            m_packets_per_sample_ = value;
         }
 
         uint32_t& samples_count() OMG_NOEXCEPT {
@@ -300,65 +286,80 @@ namespace cctypes {
             m_samples_dropped_ = value;
         }
 
-        ::rti::core::bounded_sequence< int64_t, 4L >& latency_min() OMG_NOEXCEPT {
+        ::rti::core::bounded_sequence< int64_t, 3L >& latency_min() OMG_NOEXCEPT {
             return m_latency_min_;
         }
 
-        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_min() const OMG_NOEXCEPT {
+        const ::rti::core::bounded_sequence< int64_t, 3L >& latency_min() const OMG_NOEXCEPT {
             return m_latency_min_;
         }
 
-        void latency_min(const ::rti::core::bounded_sequence< int64_t, 4L >& value) {
+        void latency_min(const ::rti::core::bounded_sequence< int64_t, 3L >& value) {
             m_latency_min_ = value;
         }
 
-        void latency_min(::rti::core::bounded_sequence< int64_t, 4L >&& value) {
+        void latency_min(::rti::core::bounded_sequence< int64_t, 3L >&& value) {
             m_latency_min_ = std::move(value);
         }
-        ::rti::core::bounded_sequence< int64_t, 4L >& latency_mean() OMG_NOEXCEPT {
+        ::rti::core::bounded_sequence< int64_t, 3L >& latency_mean() OMG_NOEXCEPT {
             return m_latency_mean_;
         }
 
-        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_mean() const OMG_NOEXCEPT {
+        const ::rti::core::bounded_sequence< int64_t, 3L >& latency_mean() const OMG_NOEXCEPT {
             return m_latency_mean_;
         }
 
-        void latency_mean(const ::rti::core::bounded_sequence< int64_t, 4L >& value) {
+        void latency_mean(const ::rti::core::bounded_sequence< int64_t, 3L >& value) {
             m_latency_mean_ = value;
         }
 
-        void latency_mean(::rti::core::bounded_sequence< int64_t, 4L >&& value) {
+        void latency_mean(::rti::core::bounded_sequence< int64_t, 3L >&& value) {
             m_latency_mean_ = std::move(value);
         }
-        ::rti::core::bounded_sequence< int64_t, 4L >& latency_max() OMG_NOEXCEPT {
+        ::rti::core::bounded_sequence< int64_t, 3L >& latency_max() OMG_NOEXCEPT {
             return m_latency_max_;
         }
 
-        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_max() const OMG_NOEXCEPT {
+        const ::rti::core::bounded_sequence< int64_t, 3L >& latency_max() const OMG_NOEXCEPT {
             return m_latency_max_;
         }
 
-        void latency_max(const ::rti::core::bounded_sequence< int64_t, 4L >& value) {
+        void latency_max(const ::rti::core::bounded_sequence< int64_t, 3L >& value) {
             m_latency_max_ = value;
         }
 
-        void latency_max(::rti::core::bounded_sequence< int64_t, 4L >&& value) {
+        void latency_max(::rti::core::bounded_sequence< int64_t, 3L >&& value) {
             m_latency_max_ = std::move(value);
         }
-        ::rti::core::bounded_sequence< uint64_t, 4L >& latency_stddev() OMG_NOEXCEPT {
+        ::rti::core::bounded_sequence< uint64_t, 3L >& latency_stddev() OMG_NOEXCEPT {
             return m_latency_stddev_;
         }
 
-        const ::rti::core::bounded_sequence< uint64_t, 4L >& latency_stddev() const OMG_NOEXCEPT {
+        const ::rti::core::bounded_sequence< uint64_t, 3L >& latency_stddev() const OMG_NOEXCEPT {
             return m_latency_stddev_;
         }
 
-        void latency_stddev(const ::rti::core::bounded_sequence< uint64_t, 4L >& value) {
+        void latency_stddev(const ::rti::core::bounded_sequence< uint64_t, 3L >& value) {
             m_latency_stddev_ = value;
         }
 
-        void latency_stddev(::rti::core::bounded_sequence< uint64_t, 4L >&& value) {
+        void latency_stddev(::rti::core::bounded_sequence< uint64_t, 3L >&& value) {
             m_latency_stddev_ = std::move(value);
+        }
+        ::rti::core::bounded_sequence< uint64_t, 4L >& timestamps_last() OMG_NOEXCEPT {
+            return m_timestamps_last_;
+        }
+
+        const ::rti::core::bounded_sequence< uint64_t, 4L >& timestamps_last() const OMG_NOEXCEPT {
+            return m_timestamps_last_;
+        }
+
+        void timestamps_last(const ::rti::core::bounded_sequence< uint64_t, 4L >& value) {
+            m_timestamps_last_ = value;
+        }
+
+        void timestamps_last(::rti::core::bounded_sequence< uint64_t, 4L >&& value) {
+            m_timestamps_last_ = std::move(value);
         }
 
         bool operator == (const ccPerf& other_) const;
@@ -371,13 +372,14 @@ namespace cctypes {
         uint64_t m_tStart_;
         uint64_t m_tDuration_;
         uint64_t m_data_count_;
-        uint32_t m_frames_per_sample_;
+        uint32_t m_packets_per_sample_;
         uint32_t m_samples_count_;
         uint32_t m_samples_dropped_;
-        ::rti::core::bounded_sequence< int64_t, 4L > m_latency_min_;
-        ::rti::core::bounded_sequence< int64_t, 4L > m_latency_mean_;
-        ::rti::core::bounded_sequence< int64_t, 4L > m_latency_max_;
-        ::rti::core::bounded_sequence< uint64_t, 4L > m_latency_stddev_;
+        ::rti::core::bounded_sequence< int64_t, 3L > m_latency_min_;
+        ::rti::core::bounded_sequence< int64_t, 3L > m_latency_mean_;
+        ::rti::core::bounded_sequence< int64_t, 3L > m_latency_max_;
+        ::rti::core::bounded_sequence< uint64_t, 3L > m_latency_stddev_;
+        ::rti::core::bounded_sequence< uint64_t, 4L > m_timestamps_last_;
 
     };
 
@@ -394,7 +396,7 @@ namespace cctypes {
 
         ccControl(
             const cctypes::payloadTypesEnum& content_type,
-            uint32_t frames_per_sample);
+            uint32_t packets_per_sample);
 
         #ifdef RTI_CXX11_RVALUE_REFERENCES
         #ifndef RTI_CXX11_NO_IMPLICIT_MOVE_OPERATIONS
@@ -423,16 +425,16 @@ namespace cctypes {
         void content_type(cctypes::payloadTypesEnum&& value) {
             m_content_type_ = std::move(value);
         }
-        uint32_t& frames_per_sample() OMG_NOEXCEPT {
-            return m_frames_per_sample_;
+        uint32_t& packets_per_sample() OMG_NOEXCEPT {
+            return m_packets_per_sample_;
         }
 
-        const uint32_t& frames_per_sample() const OMG_NOEXCEPT {
-            return m_frames_per_sample_;
+        const uint32_t& packets_per_sample() const OMG_NOEXCEPT {
+            return m_packets_per_sample_;
         }
 
-        void frames_per_sample(uint32_t value) {
-            m_frames_per_sample_ = value;
+        void packets_per_sample(uint32_t value) {
+            m_packets_per_sample_ = value;
         }
 
         bool operator == (const ccControl& other_) const;
@@ -443,7 +445,7 @@ namespace cctypes {
       private:
 
         cctypes::payloadTypesEnum m_content_type_;
-        uint32_t m_frames_per_sample_;
+        uint32_t m_packets_per_sample_;
 
     };
 
@@ -650,5 +652,5 @@ namespace rti {
 #define NDDSUSERDllExport
 #endif
 
-#endif // cctypes_751230475_hpp
+#endif // cctypes_751230169_hpp
 

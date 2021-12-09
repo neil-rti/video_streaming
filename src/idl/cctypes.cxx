@@ -29,53 +29,8 @@ namespace cctypes {
             case payloadTypesEnum::NO_PAYLOAD:
             o << "payloadTypesEnum::NO_PAYLOAD" << " ";
             break;
-            case payloadTypesEnum::TOP_INFO_EXCHANGE:
-            o << "payloadTypesEnum::TOP_INFO_EXCHANGE" << " ";
-            break;
             case payloadTypesEnum::STREAM_FFMPEG_0:
             o << "payloadTypesEnum::STREAM_FFMPEG_0" << " ";
-            break;
-            case payloadTypesEnum::STREAM_FFMPEG_1:
-            o << "payloadTypesEnum::STREAM_FFMPEG_1" << " ";
-            break;
-            case payloadTypesEnum::STREAM_GSTREAMER_0:
-            o << "payloadTypesEnum::STREAM_GSTREAMER_0" << " ";
-            break;
-            case payloadTypesEnum::STREAM_GSTREAMER_1:
-            o << "payloadTypesEnum::STREAM_GSTREAMER_1" << " ";
-            break;
-            case payloadTypesEnum::STREAM_OPENCV_0:
-            o << "payloadTypesEnum::STREAM_OPENCV_0" << " ";
-            break;
-            case payloadTypesEnum::STREAM_OPENCV_1:
-            o << "payloadTypesEnum::STREAM_OPENCV_1" << " ";
-            break;
-            case payloadTypesEnum::FILE_TRANSFER_REQUEST:
-            o << "payloadTypesEnum::FILE_TRANSFER_REQUEST" << " ";
-            break;
-            case payloadTypesEnum::FILE_TRANSFER_ACCEPT:
-            o << "payloadTypesEnum::FILE_TRANSFER_ACCEPT" << " ";
-            break;
-            case payloadTypesEnum::FILE_TRANSFER_PAYLOAD:
-            o << "payloadTypesEnum::FILE_TRANSFER_PAYLOAD" << " ";
-            break;
-            case payloadTypesEnum::FILE_TRANSFER_VERIFY:
-            o << "payloadTypesEnum::FILE_TRANSFER_VERIFY" << " ";
-            break;
-            case payloadTypesEnum::TEXT_CHAT_0:
-            o << "payloadTypesEnum::TEXT_CHAT_0" << " ";
-            break;
-            case payloadTypesEnum::TEST_PATTERN_0:
-            o << "payloadTypesEnum::TEST_PATTERN_0" << " ";
-            break;
-            case payloadTypesEnum::TRAFFIC_GEN_COMPRESSIBLE:
-            o << "payloadTypesEnum::TRAFFIC_GEN_COMPRESSIBLE" << " ";
-            break;
-            case payloadTypesEnum::TRAFFIC_GEN_NONCOMPRESSIBLE:
-            o << "payloadTypesEnum::TRAFFIC_GEN_NONCOMPRESSIBLE" << " ";
-            break;
-            case payloadTypesEnum::IMAGE_FILE:
-            o << "payloadTypesEnum::IMAGE_FILE" << " ";
             break;
             case payloadTypesEnum::MAX_PAYLOAD_ENUM:
             o << "payloadTypesEnum::MAX_PAYLOAD_ENUM" << " ";
@@ -87,28 +42,28 @@ namespace cctypes {
     // ---- ccBulk: 
 
     ccBulk::ccBulk() :
-        m_content_type_(cctypes::payloadTypesEnum::NO_PAYLOAD) ,
         m_pub_id_ ("") ,
+        m_content_type_(cctypes::payloadTypesEnum::NO_PAYLOAD) ,
         m_tstamp_first_frame_ (0ull)  {
     }   
 
     ccBulk::ccBulk (
-        const cctypes::payloadTypesEnum& content_type,
         const std::string& pub_id,
+        const cctypes::payloadTypesEnum& content_type,
         uint64_t tstamp_first_frame,
         const ::rti::core::bounded_sequence< uint8_t, (cctypes::MAX_SEQUENCE_LEN) >& data)
         :
-            m_content_type_( content_type ),
             m_pub_id_( pub_id ),
+            m_content_type_( content_type ),
             m_tstamp_first_frame_( tstamp_first_frame ),
             m_data_( data ) {
     }
 
     #ifdef RTI_CXX11_RVALUE_REFERENCES
     #ifdef RTI_CXX11_NO_IMPLICIT_MOVE_OPERATIONS
-    ccBulk::ccBulk(ccBulk&& other_) OMG_NOEXCEPT  :m_content_type_ (std::move(other_.m_content_type_))
+    ccBulk::ccBulk(ccBulk&& other_) OMG_NOEXCEPT  :m_pub_id_ (std::move(other_.m_pub_id_))
     ,
-    m_pub_id_ (std::move(other_.m_pub_id_))
+    m_content_type_ (std::move(other_.m_content_type_))
     ,
     m_tstamp_first_frame_ (std::move(other_.m_tstamp_first_frame_))
     ,
@@ -127,17 +82,17 @@ namespace cctypes {
     void ccBulk::swap(ccBulk& other_)  OMG_NOEXCEPT 
     {
         using std::swap;
-        swap(m_content_type_, other_.m_content_type_);
         swap(m_pub_id_, other_.m_pub_id_);
+        swap(m_content_type_, other_.m_content_type_);
         swap(m_tstamp_first_frame_, other_.m_tstamp_first_frame_);
         swap(m_data_, other_.m_data_);
     }  
 
     bool ccBulk::operator == (const ccBulk& other_) const {
-        if (m_content_type_ != other_.m_content_type_) {
+        if (m_pub_id_ != other_.m_pub_id_) {
             return false;
         }
-        if (m_pub_id_ != other_.m_pub_id_) {
+        if (m_content_type_ != other_.m_content_type_) {
             return false;
         }
         if (m_tstamp_first_frame_ != other_.m_tstamp_first_frame_) {
@@ -156,8 +111,8 @@ namespace cctypes {
     {
         ::rti::util::StreamFlagSaver flag_saver (o);
         o <<"[";
-        o << "content_type: " << sample.content_type()<<", ";
         o << "pub_id: " << sample.pub_id()<<", ";
+        o << "content_type: " << sample.content_type()<<", ";
         o << "tstamp_first_frame: " << sample.tstamp_first_frame()<<", ";
         o << "data: " << sample.data() ;
         o <<"]";
@@ -170,7 +125,7 @@ namespace cctypes {
         m_tStart_ (0ull) ,
         m_tDuration_ (0ull) ,
         m_data_count_ (0ull) ,
-        m_frames_per_sample_ (0u) ,
+        m_packets_per_sample_ (0u) ,
         m_samples_count_ (0u) ,
         m_samples_dropped_ (0u)  {
     }   
@@ -179,24 +134,26 @@ namespace cctypes {
         uint64_t tStart,
         uint64_t tDuration,
         uint64_t data_count,
-        uint32_t frames_per_sample,
+        uint32_t packets_per_sample,
         uint32_t samples_count,
         uint32_t samples_dropped,
-        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_min,
-        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_mean,
-        const ::rti::core::bounded_sequence< int64_t, 4L >& latency_max,
-        const ::rti::core::bounded_sequence< uint64_t, 4L >& latency_stddev)
+        const ::rti::core::bounded_sequence< int64_t, 3L >& latency_min,
+        const ::rti::core::bounded_sequence< int64_t, 3L >& latency_mean,
+        const ::rti::core::bounded_sequence< int64_t, 3L >& latency_max,
+        const ::rti::core::bounded_sequence< uint64_t, 3L >& latency_stddev,
+        const ::rti::core::bounded_sequence< uint64_t, 4L >& timestamps_last)
         :
             m_tStart_( tStart ),
             m_tDuration_( tDuration ),
             m_data_count_( data_count ),
-            m_frames_per_sample_( frames_per_sample ),
+            m_packets_per_sample_( packets_per_sample ),
             m_samples_count_( samples_count ),
             m_samples_dropped_( samples_dropped ),
             m_latency_min_( latency_min ),
             m_latency_mean_( latency_mean ),
             m_latency_max_( latency_max ),
-            m_latency_stddev_( latency_stddev ) {
+            m_latency_stddev_( latency_stddev ),
+            m_timestamps_last_( timestamps_last ) {
     }
 
     #ifdef RTI_CXX11_RVALUE_REFERENCES
@@ -207,7 +164,7 @@ namespace cctypes {
     ,
     m_data_count_ (std::move(other_.m_data_count_))
     ,
-    m_frames_per_sample_ (std::move(other_.m_frames_per_sample_))
+    m_packets_per_sample_ (std::move(other_.m_packets_per_sample_))
     ,
     m_samples_count_ (std::move(other_.m_samples_count_))
     ,
@@ -220,6 +177,8 @@ namespace cctypes {
     m_latency_max_ (std::move(other_.m_latency_max_))
     ,
     m_latency_stddev_ (std::move(other_.m_latency_stddev_))
+    ,
+    m_timestamps_last_ (std::move(other_.m_timestamps_last_))
     {
     } 
 
@@ -237,13 +196,14 @@ namespace cctypes {
         swap(m_tStart_, other_.m_tStart_);
         swap(m_tDuration_, other_.m_tDuration_);
         swap(m_data_count_, other_.m_data_count_);
-        swap(m_frames_per_sample_, other_.m_frames_per_sample_);
+        swap(m_packets_per_sample_, other_.m_packets_per_sample_);
         swap(m_samples_count_, other_.m_samples_count_);
         swap(m_samples_dropped_, other_.m_samples_dropped_);
         swap(m_latency_min_, other_.m_latency_min_);
         swap(m_latency_mean_, other_.m_latency_mean_);
         swap(m_latency_max_, other_.m_latency_max_);
         swap(m_latency_stddev_, other_.m_latency_stddev_);
+        swap(m_timestamps_last_, other_.m_timestamps_last_);
     }  
 
     bool ccPerf::operator == (const ccPerf& other_) const {
@@ -256,7 +216,7 @@ namespace cctypes {
         if (m_data_count_ != other_.m_data_count_) {
             return false;
         }
-        if (m_frames_per_sample_ != other_.m_frames_per_sample_) {
+        if (m_packets_per_sample_ != other_.m_packets_per_sample_) {
             return false;
         }
         if (m_samples_count_ != other_.m_samples_count_) {
@@ -277,6 +237,9 @@ namespace cctypes {
         if (m_latency_stddev_ != other_.m_latency_stddev_) {
             return false;
         }
+        if (m_timestamps_last_ != other_.m_timestamps_last_) {
+            return false;
+        }
         return true;
     }
     bool ccPerf::operator != (const ccPerf& other_) const {
@@ -290,13 +253,14 @@ namespace cctypes {
         o << "tStart: " << sample.tStart()<<", ";
         o << "tDuration: " << sample.tDuration()<<", ";
         o << "data_count: " << sample.data_count()<<", ";
-        o << "frames_per_sample: " << sample.frames_per_sample()<<", ";
+        o << "packets_per_sample: " << sample.packets_per_sample()<<", ";
         o << "samples_count: " << sample.samples_count()<<", ";
         o << "samples_dropped: " << sample.samples_dropped()<<", ";
         o << "latency_min: " << sample.latency_min()<<", ";
         o << "latency_mean: " << sample.latency_mean()<<", ";
         o << "latency_max: " << sample.latency_max()<<", ";
-        o << "latency_stddev: " << sample.latency_stddev() ;
+        o << "latency_stddev: " << sample.latency_stddev()<<", ";
+        o << "timestamps_last: " << sample.timestamps_last() ;
         o <<"]";
         return o;
     }
@@ -305,22 +269,22 @@ namespace cctypes {
 
     ccControl::ccControl() :
         m_content_type_(cctypes::payloadTypesEnum::NO_PAYLOAD) ,
-        m_frames_per_sample_ (0u)  {
+        m_packets_per_sample_ (0u)  {
     }   
 
     ccControl::ccControl (
         const cctypes::payloadTypesEnum& content_type,
-        uint32_t frames_per_sample)
+        uint32_t packets_per_sample)
         :
             m_content_type_( content_type ),
-            m_frames_per_sample_( frames_per_sample ) {
+            m_packets_per_sample_( packets_per_sample ) {
     }
 
     #ifdef RTI_CXX11_RVALUE_REFERENCES
     #ifdef RTI_CXX11_NO_IMPLICIT_MOVE_OPERATIONS
     ccControl::ccControl(ccControl&& other_) OMG_NOEXCEPT  :m_content_type_ (std::move(other_.m_content_type_))
     ,
-    m_frames_per_sample_ (std::move(other_.m_frames_per_sample_))
+    m_packets_per_sample_ (std::move(other_.m_packets_per_sample_))
     {
     } 
 
@@ -336,14 +300,14 @@ namespace cctypes {
     {
         using std::swap;
         swap(m_content_type_, other_.m_content_type_);
-        swap(m_frames_per_sample_, other_.m_frames_per_sample_);
+        swap(m_packets_per_sample_, other_.m_packets_per_sample_);
     }  
 
     bool ccControl::operator == (const ccControl& other_) const {
         if (m_content_type_ != other_.m_content_type_) {
             return false;
         }
-        if (m_frames_per_sample_ != other_.m_frames_per_sample_) {
+        if (m_packets_per_sample_ != other_.m_packets_per_sample_) {
             return false;
         }
         return true;
@@ -357,7 +321,7 @@ namespace cctypes {
         ::rti::util::StreamFlagSaver flag_saver (o);
         o <<"[";
         o << "content_type: " << sample.content_type()<<", ";
-        o << "frames_per_sample: " << sample.frames_per_sample() ;
+        o << "packets_per_sample: " << sample.packets_per_sample() ;
         o <<"]";
         return o;
     }
@@ -379,7 +343,7 @@ namespace rti {
 
                 static RTIBool is_initialized = RTI_FALSE;
 
-                static DDS_TypeCode_Member payloadTypesEnum_g_tc_members[18]=
+                static DDS_TypeCode_Member payloadTypesEnum_g_tc_members[3]=
                 {
 
                     {
@@ -402,25 +366,6 @@ namespace rti {
                         RTICdrTypeCodeAnnotations_INITIALIZER
                     }, 
                     {
-                        (char *)"TOP_INFO_EXCHANGE",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::TOP_INFO_EXCHANGE), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
                         (char *)"STREAM_FFMPEG_0",/* Member name */
                         {
                             0, /* Ignored */
@@ -429,272 +374,6 @@ namespace rti {
                             NULL/* Member type code is assigned later */
                         },
                         static_cast<int>(cctypes::payloadTypesEnum::STREAM_FFMPEG_0), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"STREAM_FFMPEG_1",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::STREAM_FFMPEG_1), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"STREAM_GSTREAMER_0",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::STREAM_GSTREAMER_0), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"STREAM_GSTREAMER_1",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::STREAM_GSTREAMER_1), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"STREAM_OPENCV_0",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::STREAM_OPENCV_0), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"STREAM_OPENCV_1",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::STREAM_OPENCV_1), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"FILE_TRANSFER_REQUEST",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::FILE_TRANSFER_REQUEST), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"FILE_TRANSFER_ACCEPT",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::FILE_TRANSFER_ACCEPT), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"FILE_TRANSFER_PAYLOAD",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::FILE_TRANSFER_PAYLOAD), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"FILE_TRANSFER_VERIFY",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::FILE_TRANSFER_VERIFY), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"TEXT_CHAT_0",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::TEXT_CHAT_0), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"TEST_PATTERN_0",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::TEST_PATTERN_0), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"TRAFFIC_GEN_COMPRESSIBLE",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::TRAFFIC_GEN_COMPRESSIBLE), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"TRAFFIC_GEN_NONCOMPRESSIBLE",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::TRAFFIC_GEN_NONCOMPRESSIBLE), 
-                        0, /* Ignored */
-                        0, /* Ignored */
-                        NULL, /* Ignored */
-                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
-                        DDS_PRIVATE_MEMBER,/* Member visibility */ 
-
-                        1,
-                        NULL, /* Ignored */
-                        RTICdrTypeCodeAnnotations_INITIALIZER
-                    }, 
-                    {
-                        (char *)"IMAGE_FILE",/* Member name */
-                        {
-                            0, /* Ignored */
-                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
-                            -1, /* Bitfield bits */
-                            NULL/* Member type code is assigned later */
-                        },
-                        static_cast<int>(cctypes::payloadTypesEnum::IMAGE_FILE), 
                         0, /* Ignored */
                         0, /* Ignored */
                         NULL, /* Ignored */
@@ -736,7 +415,7 @@ namespace rti {
                         0, /* Ignored */
                         0, /* Ignored */
                         NULL, /* Ignored */
-                        18, /* Number of members */
+                        3, /* Number of members */
                         payloadTypesEnum_g_tc_members, /* Members */
                         DDS_VM_NONE, /* Type Modifier */
                         RTICdrTypeCodeAnnotations_INITIALIZER,
@@ -855,7 +534,7 @@ namespace rti {
                 {
 
                     {
-                        (char *)"content_type",/* Member name */
+                        (char *)"pub_id",/* Member name */
                         {
                             0,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
@@ -873,7 +552,7 @@ namespace rti {
                         RTICdrTypeCodeAnnotations_INITIALIZER
                     }, 
                     {
-                        (char *)"pub_id",/* Member name */
+                        (char *)"content_type",/* Member name */
                         {
                             1,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
@@ -957,17 +636,17 @@ namespace rti {
                 ccBulk_g_tc._data._annotations._allowedDataRepresentationMask = 5;
 
                 ccBulk_g_tc_data_sequence._data._typeCode = (RTICdrTypeCode *)&DDS_g_tc_octet;
-                ccBulk_g_tc_members[0]._representation._typeCode = (RTICdrTypeCode *)&::rti::topic::dynamic_type< cctypes::payloadTypesEnum>::get().native();
-                ccBulk_g_tc_members[1]._representation._typeCode = (RTICdrTypeCode *)&ccBulk_g_tc_pub_id_string;
+                ccBulk_g_tc_members[0]._representation._typeCode = (RTICdrTypeCode *)&ccBulk_g_tc_pub_id_string;
+                ccBulk_g_tc_members[1]._representation._typeCode = (RTICdrTypeCode *)&::rti::topic::dynamic_type< cctypes::payloadTypesEnum>::get().native();
                 ccBulk_g_tc_members[2]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
                 ccBulk_g_tc_members[3]._representation._typeCode = (RTICdrTypeCode *)& ccBulk_g_tc_data_sequence;
 
                 /* Initialize the values for member annotations. */
-                ccBulk_g_tc_members[0]._annotations._defaultValue._d = RTI_XCDR_TK_ENUM;
-                ccBulk_g_tc_members[0]._annotations._defaultValue._u.enumerated_value = 0;
+                ccBulk_g_tc_members[0]._annotations._defaultValue._d = RTI_XCDR_TK_STRING;
+                ccBulk_g_tc_members[0]._annotations._defaultValue._u.string_value = (DDS_Char *) "";
 
-                ccBulk_g_tc_members[1]._annotations._defaultValue._d = RTI_XCDR_TK_STRING;
-                ccBulk_g_tc_members[1]._annotations._defaultValue._u.string_value = (DDS_Char *) "";
+                ccBulk_g_tc_members[1]._annotations._defaultValue._d = RTI_XCDR_TK_ENUM;
+                ccBulk_g_tc_members[1]._annotations._defaultValue._u.enumerated_value = 0;
 
                 ccBulk_g_tc_members[2]._annotations._defaultValue._d = RTI_XCDR_TK_ULONGLONG;
                 ccBulk_g_tc_members[2]._annotations._defaultValue._u.ulong_long_value = 0ull;
@@ -1008,10 +687,10 @@ namespace rti {
                 }
 
                 ccBulk_g_memberAccessInfos[0].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->content_type() - (char *)sample);
+                (RTIXCdrUnsignedLong) ((char *)&sample->pub_id() - (char *)sample);
 
                 ccBulk_g_memberAccessInfos[1].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->pub_id() - (char *)sample);
+                (RTIXCdrUnsignedLong) ((char *)&sample->content_type() - (char *)sample);
 
                 ccBulk_g_memberAccessInfos[2].bindingMemberValueOffset[0] = 
                 (RTIXCdrUnsignedLong) ((char *)&sample->tstamp_first_frame() - (char *)sample);
@@ -1093,8 +772,9 @@ namespace rti {
                 static DDS_TypeCode ccPerf_g_tc_latency_mean_sequence;
                 static DDS_TypeCode ccPerf_g_tc_latency_max_sequence;
                 static DDS_TypeCode ccPerf_g_tc_latency_stddev_sequence;
+                static DDS_TypeCode ccPerf_g_tc_timestamps_last_sequence;
 
-                static DDS_TypeCode_Member ccPerf_g_tc_members[10]=
+                static DDS_TypeCode_Member ccPerf_g_tc_members[11]=
                 {
 
                     {
@@ -1109,7 +789,7 @@ namespace rti {
                         0, /* Ignored */
                         0, /* Ignored */
                         NULL, /* Ignored */
-                        RTI_CDR_KEY_MEMBER , /* Is a key? */
+                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
                         DDS_PUBLIC_MEMBER,/* Member visibility */
                         1,
                         NULL, /* Ignored */
@@ -1152,7 +832,7 @@ namespace rti {
                         RTICdrTypeCodeAnnotations_INITIALIZER
                     }, 
                     {
-                        (char *)"frames_per_sample",/* Member name */
+                        (char *)"packets_per_sample",/* Member name */
                         {
                             3,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
@@ -1276,6 +956,24 @@ namespace rti {
                         1,
                         NULL, /* Ignored */
                         RTICdrTypeCodeAnnotations_INITIALIZER
+                    }, 
+                    {
+                        (char *)"timestamps_last",/* Member name */
+                        {
+                            10,/* Representation ID */
+                            DDS_BOOLEAN_FALSE,/* Is a pointer? */
+                            -1, /* Bitfield bits */
+                            NULL/* Member type code is assigned later */
+                        },
+                        0, /* Ignored */
+                        0, /* Ignored */
+                        0, /* Ignored */
+                        NULL, /* Ignored */
+                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
+                        DDS_PUBLIC_MEMBER,/* Member visibility */
+                        1,
+                        NULL, /* Ignored */
+                        RTICdrTypeCodeAnnotations_INITIALIZER
                     }
                 };
 
@@ -1289,7 +987,7 @@ namespace rti {
                         0, /* Ignored */
                         0, /* Ignored */
                         NULL, /* Ignored */
-                        10, /* Number of members */
+                        11, /* Number of members */
                         ccPerf_g_tc_members, /* Members */
                         DDS_VM_NONE, /* Ignored */
                         RTICdrTypeCodeAnnotations_INITIALIZER,
@@ -1302,10 +1000,11 @@ namespace rti {
                     return &ccPerf_g_tc;
                 }
 
-                ccPerf_g_tc_latency_min_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< int64_t, 4L > >((4L));
-                ccPerf_g_tc_latency_mean_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< int64_t, 4L > >((4L));
-                ccPerf_g_tc_latency_max_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< int64_t, 4L > >((4L));
-                ccPerf_g_tc_latency_stddev_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< uint64_t, 4L > >((4L));
+                ccPerf_g_tc_latency_min_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< int64_t, 3L > >((3L));
+                ccPerf_g_tc_latency_mean_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< int64_t, 3L > >((3L));
+                ccPerf_g_tc_latency_max_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< int64_t, 3L > >((3L));
+                ccPerf_g_tc_latency_stddev_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< uint64_t, 3L > >((3L));
+                ccPerf_g_tc_timestamps_last_sequence = initialize_sequence_typecode< ::rti::core::bounded_sequence< uint64_t, 4L > >((4L));
 
                 ccPerf_g_tc._data._annotations._allowedDataRepresentationMask = 5;
 
@@ -1313,6 +1012,7 @@ namespace rti {
                 ccPerf_g_tc_latency_mean_sequence._data._typeCode = (RTICdrTypeCode *)&DDS_g_tc_longlong;
                 ccPerf_g_tc_latency_max_sequence._data._typeCode = (RTICdrTypeCode *)&DDS_g_tc_longlong;
                 ccPerf_g_tc_latency_stddev_sequence._data._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
+                ccPerf_g_tc_timestamps_last_sequence._data._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
                 ccPerf_g_tc_members[0]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
                 ccPerf_g_tc_members[1]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
                 ccPerf_g_tc_members[2]._representation._typeCode = (RTICdrTypeCode *)&DDS_g_tc_ulonglong;
@@ -1323,6 +1023,7 @@ namespace rti {
                 ccPerf_g_tc_members[7]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_latency_mean_sequence;
                 ccPerf_g_tc_members[8]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_latency_max_sequence;
                 ccPerf_g_tc_members[9]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_latency_stddev_sequence;
+                ccPerf_g_tc_members[10]._representation._typeCode = (RTICdrTypeCode *)& ccPerf_g_tc_timestamps_last_sequence;
 
                 /* Initialize the values for member annotations. */
                 ccPerf_g_tc_members[0]._annotations._defaultValue._d = RTI_XCDR_TK_ULONGLONG;
@@ -1381,7 +1082,7 @@ namespace rti {
 
                 cctypes::ccPerf *sample;
 
-                static RTIXCdrMemberAccessInfo ccPerf_g_memberAccessInfos[10] =
+                static RTIXCdrMemberAccessInfo ccPerf_g_memberAccessInfos[11] =
                 {RTIXCdrMemberAccessInfo_INITIALIZER};
 
                 static RTIXCdrSampleAccessInfo ccPerf_g_sampleAccessInfo = 
@@ -1408,7 +1109,7 @@ namespace rti {
                 (RTIXCdrUnsignedLong) ((char *)&sample->data_count() - (char *)sample);
 
                 ccPerf_g_memberAccessInfos[3].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->frames_per_sample() - (char *)sample);
+                (RTIXCdrUnsignedLong) ((char *)&sample->packets_per_sample() - (char *)sample);
 
                 ccPerf_g_memberAccessInfos[4].bindingMemberValueOffset[0] = 
                 (RTIXCdrUnsignedLong) ((char *)&sample->samples_count() - (char *)sample);
@@ -1427,6 +1128,9 @@ namespace rti {
 
                 ccPerf_g_memberAccessInfos[9].bindingMemberValueOffset[0] = 
                 (RTIXCdrUnsignedLong) ((char *)&sample->latency_stddev() - (char *)sample);
+
+                ccPerf_g_memberAccessInfos[10].bindingMemberValueOffset[0] = 
+                (RTIXCdrUnsignedLong) ((char *)&sample->timestamps_last() - (char *)sample);
 
                 ccPerf_g_sampleAccessInfo.memberAccessInfos = 
                 ccPerf_g_memberAccessInfos;
@@ -1513,14 +1217,14 @@ namespace rti {
                         0, /* Ignored */
                         0, /* Ignored */
                         NULL, /* Ignored */
-                        RTI_CDR_KEY_MEMBER , /* Is a key? */
+                        RTI_CDR_REQUIRED_MEMBER, /* Is a key? */
                         DDS_PUBLIC_MEMBER,/* Member visibility */
                         1,
                         NULL, /* Ignored */
                         RTICdrTypeCodeAnnotations_INITIALIZER
                     }, 
                     {
-                        (char *)"frames_per_sample",/* Member name */
+                        (char *)"packets_per_sample",/* Member name */
                         {
                             1,/* Representation ID */
                             DDS_BOOLEAN_FALSE,/* Is a pointer? */
@@ -1613,7 +1317,7 @@ namespace rti {
                 (RTIXCdrUnsignedLong) ((char *)&sample->content_type() - (char *)sample);
 
                 ccControl_g_memberAccessInfos[1].bindingMemberValueOffset[0] = 
-                (RTIXCdrUnsignedLong) ((char *)&sample->frames_per_sample() - (char *)sample);
+                (RTIXCdrUnsignedLong) ((char *)&sample->packets_per_sample() - (char *)sample);
 
                 ccControl_g_sampleAccessInfo.memberAccessInfos = 
                 ccControl_g_memberAccessInfos;
@@ -1737,16 +1441,16 @@ namespace dds {
 
         void topic_type_support< cctypes::ccBulk >::reset_sample(cctypes::ccBulk& sample) 
         {
-            sample.content_type(cctypes::payloadTypesEnum::NO_PAYLOAD);
             sample.pub_id("");
+            sample.content_type(cctypes::payloadTypesEnum::NO_PAYLOAD);
             sample.tstamp_first_frame(0ull);
             ::rti::topic::reset_sample(sample.data());
         }
 
         void topic_type_support< cctypes::ccBulk >::allocate_sample(cctypes::ccBulk& sample, int, int) 
         {
-            ::rti::topic::allocate_sample(sample.content_type(),  -1, -1);
             ::rti::topic::allocate_sample(sample.pub_id(),  -1, (cctypes::KEY_STRING_LEN));
+            ::rti::topic::allocate_sample(sample.content_type(),  -1, -1);
             ::rti::topic::allocate_sample(sample.data(),  (cctypes::MAX_SEQUENCE_LEN), -1);
         }
 
@@ -1809,21 +1513,23 @@ namespace dds {
             sample.tStart(0ull);
             sample.tDuration(0ull);
             sample.data_count(0ull);
-            sample.frames_per_sample(0u);
+            sample.packets_per_sample(0u);
             sample.samples_count(0u);
             sample.samples_dropped(0u);
             ::rti::topic::reset_sample(sample.latency_min());
             ::rti::topic::reset_sample(sample.latency_mean());
             ::rti::topic::reset_sample(sample.latency_max());
             ::rti::topic::reset_sample(sample.latency_stddev());
+            ::rti::topic::reset_sample(sample.timestamps_last());
         }
 
         void topic_type_support< cctypes::ccPerf >::allocate_sample(cctypes::ccPerf& sample, int, int) 
         {
-            ::rti::topic::allocate_sample(sample.latency_min(),  4L, -1);
-            ::rti::topic::allocate_sample(sample.latency_mean(),  4L, -1);
-            ::rti::topic::allocate_sample(sample.latency_max(),  4L, -1);
-            ::rti::topic::allocate_sample(sample.latency_stddev(),  4L, -1);
+            ::rti::topic::allocate_sample(sample.latency_min(),  3L, -1);
+            ::rti::topic::allocate_sample(sample.latency_mean(),  3L, -1);
+            ::rti::topic::allocate_sample(sample.latency_max(),  3L, -1);
+            ::rti::topic::allocate_sample(sample.latency_stddev(),  3L, -1);
+            ::rti::topic::allocate_sample(sample.timestamps_last(),  4L, -1);
         }
 
         void topic_type_support< cctypes::ccControl >:: register_type(
@@ -1883,7 +1589,7 @@ namespace dds {
         void topic_type_support< cctypes::ccControl >::reset_sample(cctypes::ccControl& sample) 
         {
             sample.content_type(cctypes::payloadTypesEnum::NO_PAYLOAD);
-            sample.frames_per_sample(0u);
+            sample.packets_per_sample(0u);
         }
 
         void topic_type_support< cctypes::ccControl >::allocate_sample(cctypes::ccControl& sample, int, int) 

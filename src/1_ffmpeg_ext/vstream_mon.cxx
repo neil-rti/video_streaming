@@ -81,9 +81,9 @@ int perf_data_sub(dds::sub::DataReader<cctypes::ccPerf> reader)
       // std::cout << "perfdata: " << sample.data() << std::flush; // std::endl;
       // print to terminal just the important elements:
       std::cout << '\r'
-                << "dds[f]: " << std::setw(3) << sample.data().frames_per_sample() 
+                << "dds[f]: " << std::setw(3) << sample.data().packets_per_sample() 
                 << " fps: " << std::setw(3) 
-                << ((sample.data().frames_per_sample() * sample.data().samples_count()) 
+                << ((sample.data().packets_per_sample() * sample.data().samples_count()) 
                   / (static_cast<double>(sample.data().tDuration()) / 1000000000))
                 << " lat(mS):[" << std::setw(6) << (static_cast<double>(sample.data().latency_mean().at(0)) / 10000000) 
                 << " | " << std::setw(6) << (static_cast<double>(sample.data().latency_mean().at(1)) / 10000000) 
@@ -138,7 +138,7 @@ void participant_main(application::ApplicationArguments args)
   rtiComPubCtrl vidCtrl(std::string("c" + myId), CTRL_PUB_BE, participant);
 
   // init control sample?
-  vidCtrl.pub_sample_frames_per_sample_set(7);
+  vidCtrl.pub_sample_packets_per_sample_set(7);
 
   // launch thread for keyboard input
   std::thread thkey(kb_thread);
@@ -157,7 +157,7 @@ void participant_main(application::ApplicationArguments args)
       else if((fps = strtoul(key_entry.c_str(), NULL, 10)) != 0) {
         // there's a valid number entry (for the frames-per-sample value)
         std::cout << "New fps: " << fps << std::endl;
-        vidCtrl.pub_sample_frames_per_sample_set(fps);
+        vidCtrl.pub_sample_packets_per_sample_set(fps);
         vidCtrl.publish();
       }
     }

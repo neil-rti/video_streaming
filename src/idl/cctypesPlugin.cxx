@@ -608,7 +608,7 @@ namespace cctypes {
         try {
             if (endpoint_data) {} /* To avoid warnings */   
 
-            dst->content_type() = src->content_type();
+            dst->pub_id() = src->pub_id();
             return RTI_TRUE;
         } catch (...) {
             return RTI_FALSE;
@@ -623,7 +623,7 @@ namespace cctypes {
     {
         try {
             if (endpoint_data) {} /* To avoid warnings */   
-            dst->content_type() = src->content_type();
+            dst->pub_id() = src->pub_id();
             return RTI_TRUE;
         } catch (...) {
             return RTI_FALSE;
@@ -839,19 +839,6 @@ namespace cctypes {
         return RTI_TRUE;
     }
 
-    ccPerf *
-    ccPerfPluginSupport_create_key(void)
-    {
-        return ccPerfPluginSupport_create_data();
-    }
-
-    void 
-    ccPerfPluginSupport_destroy_key(
-        ccPerfKeyHolder *key) 
-    {
-        ccPerfPluginSupport_destroy_data(key);
-    }
-
     /* ----------------------------------------------------------------------------
     Callback functions:
     * ---------------------------------------------------------------------------- */
@@ -933,9 +920,6 @@ namespace cctypes {
             PRESTypePluginEndpointData epd = NULL;
             unsigned int serializedSampleMaxSize = 0;
 
-            unsigned int serializedKeyMaxSize = 0;
-            unsigned int serializedKeyMaxSizeV2 = 0;
-
             if (top_level_registration) {} /* To avoid warnings */
             if (containerPluginContext) {} /* To avoid warnings */
 
@@ -950,30 +934,11 @@ namespace cctypes {
                 ccPerfPluginSupport_create_data,
                 (PRESTypePluginDefaultEndpointDataDestroySampleFunction)
                 ccPerfPluginSupport_destroy_data,
-                (PRESTypePluginDefaultEndpointDataCreateKeyFunction)
-                cctypes::ccPerfPluginSupport_create_key ,                (PRESTypePluginDefaultEndpointDataDestroyKeyFunction)
-                cctypes::ccPerfPluginSupport_destroy_key);
+                NULL , NULL );
 
             if (epd == NULL) {
                 return NULL;
             } 
-
-            serializedKeyMaxSize =  cctypes::ccPerfPlugin_get_serialized_key_max_size(
-                epd,RTI_FALSE,RTI_CDR_ENCAPSULATION_ID_CDR_BE,0);
-            serializedKeyMaxSizeV2 = ccPerfPlugin_get_serialized_key_max_size_for_keyhash(
-                epd,
-                RTI_CDR_ENCAPSULATION_ID_CDR2_BE,
-                0);
-
-            if(!PRESTypePluginDefaultEndpointData_createMD5StreamWithInfo(
-                epd,
-                endpoint_info,
-                serializedKeyMaxSize,
-                serializedKeyMaxSizeV2))  
-            {
-                PRESTypePluginDefaultEndpointData_delete(epd);
-                return NULL;
-            }
 
             if (endpoint_info->endpointKind == PRES_TYPEPLUGIN_ENDPOINT_WRITER) {
                 serializedSampleMaxSize = cctypes::ccPerfPlugin_get_serialized_sample_max_size(
@@ -1202,7 +1167,7 @@ namespace cctypes {
     PRESTypePluginKeyKind 
     ccPerfPlugin_get_key_kind(void)
     {
-        return PRES_TYPEPLUGIN_USER_KEY;
+        return PRES_TYPEPLUGIN_NO_KEY;
     }
 
     RTIBool ccPerfPlugin_deserialize_key(
@@ -1276,70 +1241,6 @@ namespace cctypes {
         return size;
     }
 
-    RTIBool 
-    ccPerfPlugin_instance_to_key(
-        PRESTypePluginEndpointData endpoint_data,
-        ccPerfKeyHolder *dst, 
-        const ccPerf *src)
-    {
-        try {
-            if (endpoint_data) {} /* To avoid warnings */   
-
-            dst->tStart() = src->tStart();
-            return RTI_TRUE;
-        } catch (...) {
-            return RTI_FALSE;
-        }    
-    }
-
-    RTIBool 
-    ccPerfPlugin_key_to_instance(
-        PRESTypePluginEndpointData endpoint_data,
-        ccPerf *dst, const
-        ccPerfKeyHolder *src)
-    {
-        try {
-            if (endpoint_data) {} /* To avoid warnings */   
-            dst->tStart() = src->tStart();
-            return RTI_TRUE;
-        } catch (...) {
-            return RTI_FALSE;
-        }    
-    }
-
-    RTIBool 
-    ccPerfPlugin_serialized_sample_to_keyhash(
-        PRESTypePluginEndpointData endpoint_data,
-        struct RTICdrStream *stream, 
-        DDS_KeyHash_t *keyhash,
-        RTIBool deserialize_encapsulation,
-        void *endpoint_plugin_qos)
-    {
-        ccPerf * sample = NULL;
-        sample = (ccPerf *)
-        PRESTypePluginDefaultEndpointData_getTempSample(endpoint_data);
-        if (sample == NULL) {
-            return RTI_FALSE;
-        }
-        if (!PRESTypePlugin_interpretedSerializedSampleToKey(
-            endpoint_data,
-            sample,
-            stream, 
-            deserialize_encapsulation, 
-            RTI_TRUE,
-            endpoint_plugin_qos)) {
-            return RTI_FALSE;
-        }
-        if (!PRESTypePlugin_interpretedInstanceToKeyHash(
-            endpoint_data,
-            keyhash,
-            sample,
-            RTICdrStream_getEncapsulationKind(stream))) {
-            return RTI_FALSE;
-        }
-        return RTI_TRUE;   
-    }
-
     /* ------------------------------------------------------------------------
     * Plug-in Installation Methods
     * ------------------------------------------------------------------------ */
@@ -1402,40 +1303,19 @@ namespace cctypes {
         (PRESTypePluginGetKeyKindFunction)
         cctypes::ccPerfPlugin_get_key_kind;
 
-        plugin->getSerializedKeyMaxSizeFnc =   
-        (PRESTypePluginGetSerializedKeyMaxSizeFunction)
-        cctypes::ccPerfPlugin_get_serialized_key_max_size;
-        plugin->serializeKeyFnc =
-        (PRESTypePluginSerializeKeyFunction)
-        PRESTypePlugin_interpretedSerializeKey;
-        plugin->deserializeKeyFnc =
-        (PRESTypePluginDeserializeKeyFunction)
-        cctypes::ccPerfPlugin_deserialize_key;
-        plugin->deserializeKeySampleFnc =
-        (PRESTypePluginDeserializeKeySampleFunction)
-        PRESTypePlugin_interpretedDeserializeKey;
-
-        plugin-> instanceToKeyHashFnc = 
-        (PRESTypePluginInstanceToKeyHashFunction)
-        PRESTypePlugin_interpretedInstanceToKeyHash;
-        plugin->serializedSampleToKeyHashFnc = 
-        (PRESTypePluginSerializedSampleToKeyHashFunction)
-        cctypes::ccPerfPlugin_serialized_sample_to_keyhash;
-
-        plugin->getKeyFnc =
-        (PRESTypePluginGetKeyFunction)
-        ccPerfPlugin_get_key;
-        plugin->returnKeyFnc =
-        (PRESTypePluginReturnKeyFunction)
-        ccPerfPlugin_return_key;
-
-        plugin->instanceToKeyFnc =
-        (PRESTypePluginInstanceToKeyFunction)
-        cctypes::ccPerfPlugin_instance_to_key;
-        plugin->keyToInstanceFnc =
-        (PRESTypePluginKeyToInstanceFunction)
-        cctypes::ccPerfPlugin_key_to_instance;
-        plugin->serializedKeyToKeyHashFnc = NULL; /* Not supported yet */
+        /* These functions are only used for keyed types. As this is not a keyed
+        type they are all set to NULL
+        */
+        plugin->serializeKeyFnc = NULL ;    
+        plugin->deserializeKeyFnc = NULL;  
+        plugin->getKeyFnc = NULL;
+        plugin->returnKeyFnc = NULL;
+        plugin->instanceToKeyFnc = NULL;
+        plugin->keyToInstanceFnc = NULL;
+        plugin->getSerializedKeyMaxSizeFnc = NULL;
+        plugin->instanceToKeyHashFnc = NULL;
+        plugin->serializedSampleToKeyHashFnc = NULL;
+        plugin->serializedKeyToKeyHashFnc = NULL;    
         #ifdef NDDS_STANDALONE_TYPE
         plugin->typeCode = NULL; 
         #else
@@ -1514,19 +1394,6 @@ namespace cctypes {
         }
 
         return RTI_TRUE;
-    }
-
-    ccControl *
-    ccControlPluginSupport_create_key(void)
-    {
-        return ccControlPluginSupport_create_data();
-    }
-
-    void 
-    ccControlPluginSupport_destroy_key(
-        ccControlKeyHolder *key) 
-    {
-        ccControlPluginSupport_destroy_data(key);
     }
 
     /* ----------------------------------------------------------------------------
@@ -1610,9 +1477,6 @@ namespace cctypes {
             PRESTypePluginEndpointData epd = NULL;
             unsigned int serializedSampleMaxSize = 0;
 
-            unsigned int serializedKeyMaxSize = 0;
-            unsigned int serializedKeyMaxSizeV2 = 0;
-
             if (top_level_registration) {} /* To avoid warnings */
             if (containerPluginContext) {} /* To avoid warnings */
 
@@ -1627,30 +1491,11 @@ namespace cctypes {
                 ccControlPluginSupport_create_data,
                 (PRESTypePluginDefaultEndpointDataDestroySampleFunction)
                 ccControlPluginSupport_destroy_data,
-                (PRESTypePluginDefaultEndpointDataCreateKeyFunction)
-                cctypes::ccControlPluginSupport_create_key ,                (PRESTypePluginDefaultEndpointDataDestroyKeyFunction)
-                cctypes::ccControlPluginSupport_destroy_key);
+                NULL , NULL );
 
             if (epd == NULL) {
                 return NULL;
             } 
-
-            serializedKeyMaxSize =  cctypes::ccControlPlugin_get_serialized_key_max_size(
-                epd,RTI_FALSE,RTI_CDR_ENCAPSULATION_ID_CDR_BE,0);
-            serializedKeyMaxSizeV2 = ccControlPlugin_get_serialized_key_max_size_for_keyhash(
-                epd,
-                RTI_CDR_ENCAPSULATION_ID_CDR2_BE,
-                0);
-
-            if(!PRESTypePluginDefaultEndpointData_createMD5StreamWithInfo(
-                epd,
-                endpoint_info,
-                serializedKeyMaxSize,
-                serializedKeyMaxSizeV2))  
-            {
-                PRESTypePluginDefaultEndpointData_delete(epd);
-                return NULL;
-            }
 
             if (endpoint_info->endpointKind == PRES_TYPEPLUGIN_ENDPOINT_WRITER) {
                 serializedSampleMaxSize = cctypes::ccControlPlugin_get_serialized_sample_max_size(
@@ -1879,7 +1724,7 @@ namespace cctypes {
     PRESTypePluginKeyKind 
     ccControlPlugin_get_key_kind(void)
     {
-        return PRES_TYPEPLUGIN_USER_KEY;
+        return PRES_TYPEPLUGIN_NO_KEY;
     }
 
     RTIBool ccControlPlugin_deserialize_key(
@@ -1953,70 +1798,6 @@ namespace cctypes {
         return size;
     }
 
-    RTIBool 
-    ccControlPlugin_instance_to_key(
-        PRESTypePluginEndpointData endpoint_data,
-        ccControlKeyHolder *dst, 
-        const ccControl *src)
-    {
-        try {
-            if (endpoint_data) {} /* To avoid warnings */   
-
-            dst->content_type() = src->content_type();
-            return RTI_TRUE;
-        } catch (...) {
-            return RTI_FALSE;
-        }    
-    }
-
-    RTIBool 
-    ccControlPlugin_key_to_instance(
-        PRESTypePluginEndpointData endpoint_data,
-        ccControl *dst, const
-        ccControlKeyHolder *src)
-    {
-        try {
-            if (endpoint_data) {} /* To avoid warnings */   
-            dst->content_type() = src->content_type();
-            return RTI_TRUE;
-        } catch (...) {
-            return RTI_FALSE;
-        }    
-    }
-
-    RTIBool 
-    ccControlPlugin_serialized_sample_to_keyhash(
-        PRESTypePluginEndpointData endpoint_data,
-        struct RTICdrStream *stream, 
-        DDS_KeyHash_t *keyhash,
-        RTIBool deserialize_encapsulation,
-        void *endpoint_plugin_qos)
-    {
-        ccControl * sample = NULL;
-        sample = (ccControl *)
-        PRESTypePluginDefaultEndpointData_getTempSample(endpoint_data);
-        if (sample == NULL) {
-            return RTI_FALSE;
-        }
-        if (!PRESTypePlugin_interpretedSerializedSampleToKey(
-            endpoint_data,
-            sample,
-            stream, 
-            deserialize_encapsulation, 
-            RTI_TRUE,
-            endpoint_plugin_qos)) {
-            return RTI_FALSE;
-        }
-        if (!PRESTypePlugin_interpretedInstanceToKeyHash(
-            endpoint_data,
-            keyhash,
-            sample,
-            RTICdrStream_getEncapsulationKind(stream))) {
-            return RTI_FALSE;
-        }
-        return RTI_TRUE;   
-    }
-
     /* ------------------------------------------------------------------------
     * Plug-in Installation Methods
     * ------------------------------------------------------------------------ */
@@ -2079,40 +1860,19 @@ namespace cctypes {
         (PRESTypePluginGetKeyKindFunction)
         cctypes::ccControlPlugin_get_key_kind;
 
-        plugin->getSerializedKeyMaxSizeFnc =   
-        (PRESTypePluginGetSerializedKeyMaxSizeFunction)
-        cctypes::ccControlPlugin_get_serialized_key_max_size;
-        plugin->serializeKeyFnc =
-        (PRESTypePluginSerializeKeyFunction)
-        PRESTypePlugin_interpretedSerializeKey;
-        plugin->deserializeKeyFnc =
-        (PRESTypePluginDeserializeKeyFunction)
-        cctypes::ccControlPlugin_deserialize_key;
-        plugin->deserializeKeySampleFnc =
-        (PRESTypePluginDeserializeKeySampleFunction)
-        PRESTypePlugin_interpretedDeserializeKey;
-
-        plugin-> instanceToKeyHashFnc = 
-        (PRESTypePluginInstanceToKeyHashFunction)
-        PRESTypePlugin_interpretedInstanceToKeyHash;
-        plugin->serializedSampleToKeyHashFnc = 
-        (PRESTypePluginSerializedSampleToKeyHashFunction)
-        cctypes::ccControlPlugin_serialized_sample_to_keyhash;
-
-        plugin->getKeyFnc =
-        (PRESTypePluginGetKeyFunction)
-        ccControlPlugin_get_key;
-        plugin->returnKeyFnc =
-        (PRESTypePluginReturnKeyFunction)
-        ccControlPlugin_return_key;
-
-        plugin->instanceToKeyFnc =
-        (PRESTypePluginInstanceToKeyFunction)
-        cctypes::ccControlPlugin_instance_to_key;
-        plugin->keyToInstanceFnc =
-        (PRESTypePluginKeyToInstanceFunction)
-        cctypes::ccControlPlugin_key_to_instance;
-        plugin->serializedKeyToKeyHashFnc = NULL; /* Not supported yet */
+        /* These functions are only used for keyed types. As this is not a keyed
+        type they are all set to NULL
+        */
+        plugin->serializeKeyFnc = NULL ;    
+        plugin->deserializeKeyFnc = NULL;  
+        plugin->getKeyFnc = NULL;
+        plugin->returnKeyFnc = NULL;
+        plugin->instanceToKeyFnc = NULL;
+        plugin->keyToInstanceFnc = NULL;
+        plugin->getSerializedKeyMaxSizeFnc = NULL;
+        plugin->instanceToKeyHashFnc = NULL;
+        plugin->serializedSampleToKeyHashFnc = NULL;
+        plugin->serializedKeyToKeyHashFnc = NULL;    
         #ifdef NDDS_STANDALONE_TYPE
         plugin->typeCode = NULL; 
         #else

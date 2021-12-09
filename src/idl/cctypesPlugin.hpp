@@ -10,8 +10,8 @@ For more information, type 'rtiddsgen -help' at a command shell
 or consult the Code Generator User's Manual.
 */
 
-#ifndef cctypesPlugin_751230475_h
-#define cctypesPlugin_751230475_h
+#ifndef cctypesPlugin_751230169_h
+#define cctypesPlugin_751230169_h
 
 #include "cctypes.hpp"
 
@@ -275,29 +275,10 @@ namespace cctypes {
     NDDSUSERDllExport extern void
     ccBulkPlugin_delete(struct PRESTypePlugin *);
 
-    /* The type used to store keys for instances of type struct
-    * AnotherSimple.
-    *
-    * By default, this type is struct ccPerf
-    * itself. However, if for some reason this choice is not practical for your
-    * system (e.g. if sizeof(struct ccPerf)
-    * is very large), you may redefine this typedef in terms of another type of
-    * your choosing. HOWEVER, if you define the KeyHolder type to be something
-    * other than struct AnotherSimple, the
-    * following restriction applies: the key of struct
-    * ccPerf must consist of a
-    * single field of your redefined KeyHolder type and that field must be the
-    * first field in struct ccPerf.
-    */
-    typedef  class ccPerf ccPerfKeyHolder;
-
     #define ccPerfPlugin_get_sample PRESTypePluginDefaultEndpointData_getSample
 
     #define ccPerfPlugin_get_buffer PRESTypePluginDefaultEndpointData_getBuffer 
     #define ccPerfPlugin_return_buffer PRESTypePluginDefaultEndpointData_returnBuffer
-
-    #define ccPerfPlugin_get_key PRESTypePluginDefaultEndpointData_getKey 
-    #define ccPerfPlugin_return_key PRESTypePluginDefaultEndpointData_returnKey
 
     #define ccPerfPlugin_create_sample PRESTypePluginDefaultEndpointData_createSample 
     #define ccPerfPlugin_destroy_sample PRESTypePluginDefaultEndpointData_deleteSample 
@@ -339,20 +320,6 @@ namespace cctypes {
         const ccPerf *sample,
         const char *desc,
         unsigned int indent);
-
-    NDDSUSERDllExport extern ccPerf*
-    ccPerfPluginSupport_create_key_ex(RTIBool allocate_pointers);
-
-    NDDSUSERDllExport extern ccPerf*
-    ccPerfPluginSupport_create_key(void);
-
-    NDDSUSERDllExport extern void 
-    ccPerfPluginSupport_destroy_key_ex(
-        ccPerfKeyHolder *key,RTIBool deallocate_pointers);
-
-    NDDSUSERDllExport extern void 
-    ccPerfPluginSupport_destroy_key(
-        ccPerfKeyHolder *key);
 
     /* ----------------------------------------------------------------------------
     Callback functions:
@@ -457,26 +424,6 @@ namespace cctypes {
         RTIBool deserialize_key,
         void *endpoint_plugin_qos);
 
-    NDDSUSERDllExport extern RTIBool 
-    ccPerfPlugin_instance_to_key(
-        PRESTypePluginEndpointData endpoint_data,
-        ccPerfKeyHolder *key, 
-        const ccPerf *instance);
-
-    NDDSUSERDllExport extern RTIBool 
-    ccPerfPlugin_key_to_instance(
-        PRESTypePluginEndpointData endpoint_data,
-        ccPerf *instance, 
-        const ccPerfKeyHolder *key);
-
-    NDDSUSERDllExport extern RTIBool 
-    ccPerfPlugin_serialized_sample_to_keyhash(
-        PRESTypePluginEndpointData endpoint_data,
-        struct RTICdrStream *stream, 
-        DDS_KeyHash_t *keyhash,
-        RTIBool deserialize_encapsulation,
-        void *endpoint_plugin_qos); 
-
     /* Plugin Functions */
     NDDSUSERDllExport extern struct PRESTypePlugin*
     ccPerfPlugin_new(void);
@@ -484,29 +431,10 @@ namespace cctypes {
     NDDSUSERDllExport extern void
     ccPerfPlugin_delete(struct PRESTypePlugin *);
 
-    /* The type used to store keys for instances of type struct
-    * AnotherSimple.
-    *
-    * By default, this type is struct ccControl
-    * itself. However, if for some reason this choice is not practical for your
-    * system (e.g. if sizeof(struct ccControl)
-    * is very large), you may redefine this typedef in terms of another type of
-    * your choosing. HOWEVER, if you define the KeyHolder type to be something
-    * other than struct AnotherSimple, the
-    * following restriction applies: the key of struct
-    * ccControl must consist of a
-    * single field of your redefined KeyHolder type and that field must be the
-    * first field in struct ccControl.
-    */
-    typedef  class ccControl ccControlKeyHolder;
-
     #define ccControlPlugin_get_sample PRESTypePluginDefaultEndpointData_getSample
 
     #define ccControlPlugin_get_buffer PRESTypePluginDefaultEndpointData_getBuffer 
     #define ccControlPlugin_return_buffer PRESTypePluginDefaultEndpointData_returnBuffer
-
-    #define ccControlPlugin_get_key PRESTypePluginDefaultEndpointData_getKey 
-    #define ccControlPlugin_return_key PRESTypePluginDefaultEndpointData_returnKey
 
     #define ccControlPlugin_create_sample PRESTypePluginDefaultEndpointData_createSample 
     #define ccControlPlugin_destroy_sample PRESTypePluginDefaultEndpointData_deleteSample 
@@ -548,20 +476,6 @@ namespace cctypes {
         const ccControl *sample,
         const char *desc,
         unsigned int indent);
-
-    NDDSUSERDllExport extern ccControl*
-    ccControlPluginSupport_create_key_ex(RTIBool allocate_pointers);
-
-    NDDSUSERDllExport extern ccControl*
-    ccControlPluginSupport_create_key(void);
-
-    NDDSUSERDllExport extern void 
-    ccControlPluginSupport_destroy_key_ex(
-        ccControlKeyHolder *key,RTIBool deallocate_pointers);
-
-    NDDSUSERDllExport extern void 
-    ccControlPluginSupport_destroy_key(
-        ccControlKeyHolder *key);
 
     /* ----------------------------------------------------------------------------
     Callback functions:
@@ -666,26 +580,6 @@ namespace cctypes {
         RTIBool deserialize_key,
         void *endpoint_plugin_qos);
 
-    NDDSUSERDllExport extern RTIBool 
-    ccControlPlugin_instance_to_key(
-        PRESTypePluginEndpointData endpoint_data,
-        ccControlKeyHolder *key, 
-        const ccControl *instance);
-
-    NDDSUSERDllExport extern RTIBool 
-    ccControlPlugin_key_to_instance(
-        PRESTypePluginEndpointData endpoint_data,
-        ccControl *instance, 
-        const ccControlKeyHolder *key);
-
-    NDDSUSERDllExport extern RTIBool 
-    ccControlPlugin_serialized_sample_to_keyhash(
-        PRESTypePluginEndpointData endpoint_data,
-        struct RTICdrStream *stream, 
-        DDS_KeyHash_t *keyhash,
-        RTIBool deserialize_encapsulation,
-        void *endpoint_plugin_qos); 
-
     /* Plugin Functions */
     NDDSUSERDllExport extern struct PRESTypePlugin*
     ccControlPlugin_new(void);
@@ -702,5 +596,5 @@ namespace cctypes {
 #define NDDSUSERDllExport
 #endif
 
-#endif /* cctypesPlugin_751230475_h */
+#endif /* cctypesPlugin_751230169_h */
 

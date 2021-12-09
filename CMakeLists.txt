@@ -26,14 +26,6 @@ set(SOURCES_TYPSUPT
 )
 
 # - Executables to build ----------------------------------------------------------------------------
-# vsffmpeg_ext : video streaming with FFMPEG (external using stdio)
-add_executable(vsffmpeg_ext 
-  src/1_ffmpeg_ext/ffmpeg_stdio.cxx
-  src/0_common/rti_comms.cxx
-  src/0_common/murmurhash3.cpp
-  ${SOURCES_TYPSUPT})
-target_link_libraries(vsffmpeg_ext PUBLIC RTIConnextDDS::cpp2_api)
-
 # vsffmpeg_udp : video streaming with FFMPEG (external using udp)
 add_executable(vsffmpeg_udp 
   src/1_ffmpeg_ext/ffmpeg_udp.cxx

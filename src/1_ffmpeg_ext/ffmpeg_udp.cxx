@@ -44,7 +44,6 @@ char* tmpBuf;
 const int tmpBufMax = 131072;
 int inx, outx, rollx;
 uint64_t intot, outtot;
-
 std::condition_variable cv;
 std::mutex mtx;
 
@@ -332,7 +331,7 @@ void participant_main(application::ApplicationArguments args)
           tCtrlCheck = tEnd;
           waitset.dispatch(dds::core::Duration(0, 200000));
           if (ctrlSub.sub_samples_in_queue()) {
-            uint32_t newSize = ctrlSub.oldest_sub_sample().frames_per_sample();
+            uint32_t newSize = ctrlSub.oldest_sub_sample().packets_per_sample();
             fprintf(stderr, "New size: %u\n", newSize);
             args.pub_data_size = newSize * 188;
             cnxStream.pub_sample_data_size_set(args.pub_data_size);
@@ -362,12 +361,10 @@ void participant_main(application::ApplicationArguments args)
         return;
     }
 
-    
     // set up to send to loopback address and the specified port.
     destination.sin_family = AF_INET;
     destination.sin_port = htons(port_base + 1);
     destination.sin_addr.s_addr = inet_addr(hostname.c_str());
-
 
 #else
     sock = ::socket(AF_INET, SOCK_DGRAM, 0);
@@ -393,9 +390,10 @@ void participant_main(application::ApplicationArguments args)
         perfPub.pub_sample_count_samples_set(perfRep.samplesInInterval);
         perfPub.pub_sample_count_data_set(perfRep.dataSumInInterval);
         perfPub.pub_sample_drop_samples_set(perfRep.dropCount);
-        perfPub.pub_sample_frames_per_sample_set(perfRep.framesPerSample);
+        perfPub.pub_sample_packets_per_sample_set(perfRep.framesPerSample);
         perfPub.pub_sample_tstart_set(perfRep.intervalActualStart);
         perfPub.pub_sample_tduration_set(perfRep.intervalActualDuration);
+        perfPub.pub_sample_last_timestamps_set(perfRep.tStampLast);
         perfPub.publish();
 #else
         for(int i=0 ; i<4 ; i++) {

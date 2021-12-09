@@ -114,11 +114,12 @@ public:
     void pub_sample_latency_max_set(std::vector<int64_t> latMax) { pub_sample.latency_max() = latMax; }
     void pub_sample_latency_stddev_set(std::vector<uint64_t> stddev) { pub_sample.latency_stddev() = stddev; }
     void pub_sample_drop_samples_set(uint32_t drops) { pub_sample.samples_dropped(drops); }
-    void pub_sample_frames_per_sample_set(uint32_t count) { pub_sample.frames_per_sample(count); }
+    void pub_sample_packets_per_sample_set(uint32_t count) { pub_sample.packets_per_sample(count); }
     void pub_sample_count_samples_set(uint32_t count) { pub_sample.samples_count(count); }
     void pub_sample_count_data_set(uint64_t datacount) { pub_sample.data_count(datacount); }
     void pub_sample_tstart_set(uint64_t tStart) { pub_sample.tStart(tStart); }
     void pub_sample_tduration_set(uint64_t tDuration) { pub_sample.tDuration(tDuration); }
+    void pub_sample_last_timestamps_set(std::vector<uint64_t> lasttimes) { pub_sample.timestamps_last() = lasttimes; }
 
     // sub sample
     cctypes::ccPerf pop_sub_sample(void) { 
@@ -164,7 +165,7 @@ public:
     void datarcv_waitset(int32_t secs, uint32_t nsecs) { waitset->dispatch(dds::core::Duration(secs, nsecs)); }
 
     // pub sample element setters
-    void pub_sample_frames_per_sample_set(uint32_t fps) { pub_sample.frames_per_sample(fps);  }
+    void pub_sample_packets_per_sample_set(uint32_t fps) { pub_sample.packets_per_sample(fps);  }
 
     // sub sample
     cctypes::ccControl pop_sub_sample(void) { 
