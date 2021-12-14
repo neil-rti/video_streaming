@@ -49,7 +49,7 @@ int sock;
 #endif
 // this uses a common buffer to pass data from UDP thread to DDS exporter
 char* tmpBuf;
-const int32_t tmpBufMax = 131072;
+const int32_t tmpBufMax = 1048576;
 uint32_t inx, outx, rollx;
 uint64_t intot, outtot;
 // mutex & condition variable for synchronization (thread to main)
@@ -156,10 +156,10 @@ void udp_input_thread(void)
         if (inx > rollx) rollx = inx;
 
         // wrap the buffer if either: very close to end, 
-        // or if past the halfway point and a chunk of data < 1472 bytes
+        // or if near the end and a chunk of data < 1472 bytes
         // was just received, as these tend to result in alignment
         // with the MPEG-TS packets (which are 188 bytes in length)
-        if (((inx > (tmpBufMax / 2)) && (udp_bytes_rcvd < 1472))
+        if (((inx > ((7 * tmpBufMax) / 8)) && (udp_bytes_rcvd < 1472))
             || ((inx + 1472) >= tmpBufMax))
         {
             rollx = inx;
