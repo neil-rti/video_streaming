@@ -20,24 +20,21 @@ find_package(RTIConnextDDS)
 # - Point to the source dirs and files ----------
 include_directories("src" "src/idl" "src/toml" "src/0_common" ${CONNEXTDDS_INCLUDE_DIRS})
 
-set(SOURCES_TYPSUPT
-  src/idl/cctypes.cxx
-  src/idl/cctypesPlugin.cxx
-)
-
 # - Executables to build ----------------------------------------------------------------------------
-# vsffmpeg_udp : video streaming with FFMPEG (external using udp)
-add_executable(vsffmpeg_udp 
-  src/1_ffmpeg_ext/ffmpeg_udp.cxx
+# streamvid : video streaming with FFMPEG (external using udp)
+add_executable(streamvid 
+  src/1_ffmpeg_ext/stream_vid.cxx
   src/0_common/rti_comms.cxx
   src/0_common/murmurhash3.cpp
-  ${SOURCES_TYPSUPT})
-target_link_libraries(vsffmpeg_udp PUBLIC RTIConnextDDS::cpp2_api)
+  src/idl/cc_str_com_types.cxx
+  src/idl/cc_str_com_typesPlugin.cxx)
+target_link_libraries(streamvid PUBLIC RTIConnextDDS::cpp2_api)
 
-# vstream_mon : performance monitoring of video streaming example
-add_executable(vstream_mon 
-  src/1_ffmpeg_ext/vstream_mon.cxx
-  src/0_common/rti_comms.cxx
+# streamperf : performance monitoring of video streaming example
+add_executable(streamperf 
+  src/1_ffmpeg_ext/stream_test.cxx
+  src/0_common/rti_comm_test.cxx
   src/0_common/murmurhash3.cpp
-  ${SOURCES_TYPSUPT})
-target_link_libraries(vstream_mon PUBLIC RTIConnextDDS::cpp2_api)
+  src/idl/cc_str_test_types.cxx
+  src/idl/cc_str_test_typesPlugin.cxx)
+target_link_libraries(streamperf PUBLIC RTIConnextDDS::cpp2_api)

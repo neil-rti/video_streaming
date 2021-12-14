@@ -51,29 +51,26 @@ namespace application {
     struct ApplicationArguments {
         ParseReturn parse_result;
         unsigned int domain_id;
-        std::string far_name;
-        std::string near_name;
-        bool use_reliable;
-        bool pub_else_sub;
-        uint32_t pub_data_size;
+        std::string this_station_name;
+        uint32_t data_sample_size;
+        std::string from_station_name;
+        bool is_vid_pub;
         rti::config::Verbosity verbosity;
 
         ApplicationArguments(
             ParseReturn parse_result_param,
             unsigned int domain_id_param,
-            std::string far_name_param,
-            std::string near_name_param,
-            bool use_reliable_param,
-            bool pub_else_sub_param,
-            uint32_t pub_data_size_param,
+            std::string this_station_name_param,
+            uint32_t data_sample_size_param,
+            std::string from_station_name_param,
+            bool is_vid_pub_param,
             rti::config::Verbosity verbosity_param)
             : parse_result(parse_result_param),
             domain_id(domain_id_param),
-            far_name(far_name_param),
-            near_name(near_name_param),
-            use_reliable(use_reliable_param),
-            pub_else_sub(pub_else_sub_param),
-            pub_data_size(pub_data_size_param),
+            this_station_name(this_station_name_param),
+            data_sample_size(data_sample_size_param),
+            from_station_name(from_station_name_param),
+            is_vid_pub(is_vid_pub_param),
             verbosity(verbosity_param) {}
     };
 
@@ -115,13 +112,12 @@ namespace application {
         // arg priority is: 1:cmdLine args, 2:args from config file, 3: defaults
         // 3: init with defaults
         unsigned int domain_id = 0;
-        std::string far_name = "Default Far Name";      // ID name to contact
-        std::string near_name = "Default Near Name";    // My ID name
+        std::string this_station_name = "My station default name";    // my station name 
+        std::string from_station_name = "From station default name";  // Receive data from this station
         std::string config_filename = config_filename_default;
-        bool use_reliable = false;
-        bool pub_else_sub = false;
+        bool is_vid_pub = true;
         bool writeback_config_file = false;
-        uint32_t pub_data_size = 1024;
+        uint32_t data_sample_size = 1504;
         rti::config::Verbosity verbosity(rti::config::Verbosity::EXCEPTION);
 
         // 2: parms from config file.  Was one specified as cmdline arg?
@@ -145,133 +141,121 @@ namespace application {
         } catch(const std::runtime_error& e) {
             config_file_exists = false;
         }
-        if(config_file_exists) {
-            if(cfgfiledata.contains("near_name")) {
-                near_name = toml::find_or<std::string>(cfgfiledata, "near_name", "cfgfile_type_error");
-            }
-            if(cfgfiledata.contains("far_name")) {
-                far_name = toml::find_or<std::string>(cfgfiledata, "far_name", "cfgfile_type_error");
-            }
-            if(cfgfiledata.contains("domain")) {
+        if (config_file_exists) {
+            if (cfgfiledata.contains("domain")) {
                 domain_id = toml::find_or<unsigned int>(cfgfiledata, "domain", 0);
             }
-            if(cfgfiledata.contains("pubsub")) {
-                std::string pubsub = toml::find_or<std::string>(cfgfiledata, "pubsub", "cfgfile_type_error");
-                std::size_t found = pubsub.find("pub");
-                pub_else_sub = (found != std::string::npos);
+            if (cfgfiledata.contains("this_station_name")) {
+                this_station_name = toml::find_or<std::string>(cfgfiledata, "this_station_name", "cfgfile_type_error");
             }
-            if(cfgfiledata.contains("reliability")) {
-                std::string reltype = toml::find_or<std::string>(cfgfiledata, "reliability", "cfgfile_type_error");
-                std::size_t found = reltype.find("rel");
-                use_reliable = (found != std::string::npos);
+            if (cfgfiledata.contains("data_sample_size")) {
+                data_sample_size = toml::find_or<uint32_t>(cfgfiledata, "data_sample_size", 1111);
             }
-            if(cfgfiledata.contains("data_chunk_size")) {
-                pub_data_size = toml::find_or<uint32_t>(cfgfiledata, "data_chunk_size", 1111);
+            if (cfgfiledata.contains("from_station_name")) {
+                from_station_name = toml::find_or<std::string>(cfgfiledata, "from_station_name", "cfgfile_type_error");
+                is_vid_pub = false;
             }
         }
+
 
         // 1: parse the command line args
         arg_processing = 1;
         while (arg_processing < argc) {
-            if ((argc > arg_processing + 1) 
-            && (strcmp(argv[arg_processing], "-d") == 0
-            || strcmp(argv[arg_processing], "--domain") == 0)) {
+            if ((argc > arg_processing + 1)
+                && (strcmp(argv[arg_processing], "-d") == 0
+                    || strcmp(argv[arg_processing], "--domain") == 0)) {
                 domain_id = atoi(argv[arg_processing + 1]);
                 arg_processing += 2;
-            } else if ((argc > arg_processing + 1)
-            && (strcmp(argv[arg_processing], "-f") == 0
-            || strcmp(argv[arg_processing], "--farname") == 0)) {
-                far_name = std::string(argv[arg_processing + 1]);
+            }
+            else if ((argc > arg_processing + 1)
+                && (strcmp(argv[arg_processing], "-m") == 0
+                    || strcmp(argv[arg_processing], "--me") == 0)) {
+                this_station_name = std::string(argv[arg_processing + 1]);
                 arg_processing += 2;
-            } else if ((argc > arg_processing + 1)
-            && (strcmp(argv[arg_processing], "-n") == 0
-            || strcmp(argv[arg_processing], "--nearname") == 0)) {
-                near_name = std::string(argv[arg_processing + 1]);
+            }
+            else if ((argc > arg_processing + 1)
+                && (strcmp(argv[arg_processing], "-f") == 0
+                    || strcmp(argv[arg_processing], "--from") == 0)) {
+                from_station_name = std::string(argv[arg_processing + 1]);
                 arg_processing += 2;
-            } else if ((argc > arg_processing + 1)
-            && (strcmp(argv[arg_processing], "-p") == 0
-            || strcmp(argv[arg_processing], "--pubsub") == 0)) {
-                std::string dirTmp = std::string(argv[arg_processing + 1]);
-                std::size_t found = dirTmp.find("pub");
-                pub_else_sub = (found != std::string::npos);
+            }
+            else if ((argc > arg_processing + 1)
+                && (strcmp(argv[arg_processing], "-s") == 0
+                    || strcmp(argv[arg_processing], "--size") == 0)) {
+                data_sample_size = atoi(argv[arg_processing + 1]);
                 arg_processing += 2;
-            } else if ((argc > arg_processing + 1)
-            && (strcmp(argv[arg_processing], "-r") == 0
-            || strcmp(argv[arg_processing], "--reliability") == 0)) {
-                std::string relTmp = std::string(argv[arg_processing + 1]);
-                std::size_t found = relTmp.find("rel");
-                use_reliable = (found != std::string::npos);
-                arg_processing += 2;
-            } else if ((argc > arg_processing + 1)
-            && (strcmp(argv[arg_processing], "-s") == 0
-            || strcmp(argv[arg_processing], "--size") == 0)) {
-                pub_data_size = atoi(argv[arg_processing + 1]);
-                arg_processing += 2;
-            } else if ((argc > arg_processing + 1)
-            && (strcmp(argv[arg_processing], "-c") == 0
-            || strcmp(argv[arg_processing], "--configfile") == 0)) {
+            }
+            else if ((argc > arg_processing + 1)
+                && (strcmp(argv[arg_processing], "-c") == 0
+                    || strcmp(argv[arg_processing], "--configfile") == 0)) {
                 config_filename = std::string(argv[arg_processing + 1]);
                 arg_processing += 2;
-            } else if ((strcmp(argv[arg_processing], "-w") == 0
-            || strcmp(argv[arg_processing], "--writeback") == 0)) {
+            }
+            else if ((strcmp(argv[arg_processing], "-p") == 0
+                || strcmp(argv[arg_processing], "--pub") == 0)) {
+                is_vid_pub = true;
+                arg_processing += 1;
+            }
+            else if ((strcmp(argv[arg_processing], "-s") == 0
+                || strcmp(argv[arg_processing], "--sub") == 0)) {
+                is_vid_pub = false;
+                arg_processing += 1;
+            }
+            else if ((strcmp(argv[arg_processing], "-w") == 0
+                || strcmp(argv[arg_processing], "--writeback") == 0)) {
                 writeback_config_file = true;
                 arg_processing += 1;
-            } else if ((argc > arg_processing + 1)
-            && (strcmp(argv[arg_processing], "-v") == 0
-            || strcmp(argv[arg_processing], "--verbosity") == 0)) {
+            }
+            else if ((argc > arg_processing + 1)
+                && (strcmp(argv[arg_processing], "-v") == 0
+                    || strcmp(argv[arg_processing], "--verbosity") == 0)) {
                 set_verbosity(verbosity, atoi(argv[arg_processing + 1]));
                 arg_processing += 2;
-            } else if (strcmp(argv[arg_processing], "-h") == 0
-            || strcmp(argv[arg_processing], "--help") == 0) {
+            }
+            else if (strcmp(argv[arg_processing], "-h") == 0
+                || strcmp(argv[arg_processing], "--help") == 0) {
                 std::cout << "Example application." << std::endl;
                 show_usage = true;
                 parse_result = ParseReturn::exit;
                 break;
-            } else {
+            }
+            else {
                 std::cout << "Bad parameter." << std::endl;
                 show_usage = true;
                 parse_result = ParseReturn::failure;
                 break;
             }
         }
+
         if (show_usage) {
             std::cout << "Usage:\n"\
-            "    -d, --domain      <int>     Domain ID this application will operate in\n" \
-            "                                Default: " << domain_id << "\n"\
-            "    -f, --farname     <string>  ID of the station to contact\n" \
-            "                                Default: " << far_name << "\n"\
-            "    -n, --nearname    <string>  ID of this station\n" \
-            "                                Default: " << near_name << "\n"\
-            "    -p, --pubsub      <pub|sub> Endpoint type: pub or sub\n" \
-            "                                Default: sub\n"\
-            "    -r, --reliability <rel|be>  Reliability type: best effort or reliable\n" \
-            "                                Default: be\n"\
-            "    -s, --size        <int>     Size of the data portion to be streamed\n"\
-            "                                Default: " << pub_data_size << "\n"\
-            "    -c, --configfile  <string>  Configuration filename to load\n"\
-            "                                Default: " << config_filename_default << "\n"\
-            "    -w, --writeback             Write-back to the config file, updated args\n"\
-            "                                \n"\
-            "    -v, --verbosity   <int>     How much debugging output to show.\n"\
-            "                                Range: 0-3 \n"\
-            "                                Default: 1 (EXCEPTION)\n"\
-            "    -h, --help                  Print this list and exit\n"\
-            << std::endl;
+                "    -d, --domain      <int>     Domain ID this application will operate in\n" \
+                "                                Default: " << domain_id << "\n"\
+                "    -p, --pub                   Publish (video stream)\n"\
+                "    -s, --sub                   Subscribe (video stream)\n"\
+                "    -m, --me          <string>  ID of this station\n" \
+                "                                Default: " << this_station_name << "\n"\
+                "    -f, --from        <string>  Receive data from this station\n" \
+                "                                Default: " << from_station_name << "\n"\
+                "    -s, --size        <int>     Size of the data portion to be streamed\n"\
+                "                                Default: " << data_sample_size << "\n"\
+                "    -c, --configfile  <string>  Configuration filename to load\n"\
+                "                                Default: " << config_filename_default << "\n"\
+                "    -w, --writeback             Write-back to the config file, updated args\n"\
+                "                                \n"\
+                "    -v, --verbosity   <int>     How much debugging output to show.\n"\
+                "                                Range: 0-3 \n"\
+                "                                Default: 1 (EXCEPTION)\n"\
+                "    -h, --help                  Print this list and exit\n"\
+                << std::endl;
         }
 
         // write-back the config file if asked
         if(writeback_config_file) {
-            cfgfiledata["near_name"] = near_name;
-            cfgfiledata["far_name"] = far_name;
             cfgfiledata["domain"] = domain_id;
-            if(pub_else_sub) {
-                cfgfiledata["pubsub"] = "pub";
-            }
-            else {
-                cfgfiledata["pubsub"] = "sub";
-            }
-            cfgfiledata["reliability"] = use_reliable ? "reliable" : "best effort";
-            cfgfiledata["data_chunk_size"] = pub_data_size;
+            cfgfiledata["this_station_name"] = this_station_name;
+            cfgfiledata["data_sample_size"] = data_sample_size;
+            cfgfiledata["from_station_name"] = from_station_name;
 
             std::ofstream fout(config_filename);
             if(fout) {
@@ -283,10 +267,49 @@ namespace application {
         }
 
         return ApplicationArguments(
-            parse_result, domain_id, far_name, near_name, 
-            use_reliable, pub_else_sub, pub_data_size, verbosity);
+            parse_result, domain_id, this_station_name, data_sample_size, from_station_name, 
+            is_vid_pub, verbosity);
  
     }
+
+    /** ----------------------------------------------------------------
+     * contact_name_to_id()
+     * create a hash of the name, convert to BASE64 and produce an ID
+     * composed of: [first 1-3 chars of name][5-7 chars of BASE64 hash (30 bit equiv)]
+     * This is done to make a consistent size, human-readable ID from the name string.
+     **/
+    inline void contact_name_to_id(std::string name, std::string& id)
+    {
+        // get a hash of the name string, convert to BASE64 string
+        uint64_t nameHash[2];
+        uint32_t hashSeed = 0x0ec3d821;   // no significance to this number, other that it is prime
+        MurmurHash3_x64_128(name.c_str(), (int)name.size(), hashSeed, &nameHash);
+
+        char b64[9];
+        for (int i = 0; i < 8; i++) {
+            if ((nameHash[0] & 0x3f) < 26) { b64[i] = 'A' + (nameHash[0] & 0x3f); }
+            else if ((nameHash[0] & 0x3f) < 52) { b64[i] = 'a' + ((nameHash[0] & 0x3f) - 26); }
+            else if ((nameHash[0] & 0x3f) < 62) { b64[i] = '0' + ((nameHash[0] & 0x3f) - 52); }
+            else if ((nameHash[0] & 0x3f) == 62) { b64[i] = '+'; }
+            else { b64[i] = '/'; }
+            nameHash[0] = (nameHash[0] >> 6) | ((nameHash[1] & 0x3f) << 58);
+            nameHash[1] = nameHash[1] >> 6;
+        }
+        b64[8] = 0;
+
+        // now construct the ID from: [first 1-3 chars of name : 7-5 char BASE64 hash] = 8-char total
+        size_t nameLen = name.size();
+        if (nameLen > 3) nameLen = 3;
+        size_t b64Len = 8 - nameLen;
+        int i = 0;
+        while (nameLen--) {
+            id.push_back(name.at(i++));
+        }
+        while (b64Len--) {
+            id.push_back(b64[i++]);
+        }
+    }
+
 
 }  // namespace application
 

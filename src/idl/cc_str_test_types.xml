@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dds xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="file:///C:/Program Files/rti_connext_dds-6.1.0/bin/../resource/app/app_support/rtiddsgen/schema/rti_dds_profiles.xsd">
+<types>
+<module name="cctypes">
+  <const name="MAX_SEQUENCE_LEN" type="uint32" value="18800"/>
+  <const name="KEY_STRING_LEN" type="uint8" value="8"/>
+  <const name="MAX_LATENCY_SEGMENTS" type="uint32" value="16"/>
+  <enum name="commandMode">
+    <enumerator name="PING_2SEC" value="0"/>
+    <enumerator name="REPEAT_ONLY"/>
+    <enumerator name="MAX_CMDMODE_ENUM"/>
+  </enum> 
+  <struct name= "ccPerf">
+    <member name="pub_id" stringMaxLength="cctypes::KEY_STRING_LEN" type="string" key="true"/>
+    <member name="sequence_id" type="uint32"/>
+    <member name="command_mode" type="nonBasic"  nonBasicTypeName= "cctypes::commandMode"/>
+    <member name="next_data_idx" type="uint16"/>
+    <member name="data_payload" sequenceMaxLength="cctypes::MAX_SEQUENCE_LEN" type="uint8"/>
+  </struct>
+  <enum name="fillType">
+    <enumerator name="ALLZEROS" value="0"/>
+    <enumerator name="PRNGDATA"/>
+    <enumerator name="MAX_FILLTYPE_ENUM"/>
+  </enum> 
+  <struct name= "ccTestControl">
+    <member name="test_number" type="uint32"/>
+    <member name="command_mode" type="nonBasic"  nonBasicTypeName= "cctypes::commandMode"/>
+    <member name="data_init_type" type="nonBasic"  nonBasicTypeName= "cctypes::fillType"/>
+    <member name="bytes_per_sample" type="uint32"/>
+    <member name="bytes_per_second" type="uint32"/>
+    <member name="reports_per_second" type="float32"/>
+    <member name="test_duration_millisec" type="uint32"/>
+  </struct>
+  <struct name= "ccTestReport">
+    <member name="test_number" type="uint32"/>
+    <member name="samples_total" type="uint32"/>
+    <member name="lost_samples_total" type="uint32"/>
+    <member name="data_bytes_total" type="uint64"/>
+    <member name="latencyMin" sequenceMaxLength="cctypes::MAX_LATENCY_SEGMENTS" type="float32"/>
+    <member name="latencyMean" sequenceMaxLength="cctypes::MAX_LATENCY_SEGMENTS" type="float32"/>
+    <member name="latencyMax" sequenceMaxLength="cctypes::MAX_LATENCY_SEGMENTS" type="float32"/>
+    <member name="latencyStdDev" sequenceMaxLength="cctypes::MAX_LATENCY_SEGMENTS" type="float32"/>
+  </struct>
+</module>
+</types>
+</dds>

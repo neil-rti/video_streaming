@@ -3,17 +3,17 @@
 /*
 WARNING: THIS FILE IS AUTO-GENERATED. DO NOT MODIFY.
 
-This file was generated from cctypes.idl
+This file was generated from cc_str_test_types.idl
 using RTI Code Generator (rtiddsgen) version 3.1.0.
 The rtiddsgen tool is part of the RTI Connext DDS distribution.
 For more information, type 'rtiddsgen -help' at a command shell
 or consult the Code Generator User's Manual.
 */
 
-#ifndef cctypesPlugin_751230169_h
-#define cctypesPlugin_751230169_h
+#ifndef cc_str_test_typesPlugin_1867997756_h
+#define cc_str_test_typesPlugin_1867997756_h
 
-#include "cctypes.hpp"
+#include "cc_str_test_types.hpp"
 
 struct RTICdrStream;
 
@@ -35,7 +35,7 @@ namespace cctypes {
     * ------------------------------------------------------------------------- */
 
     NDDSUSERDllExport extern unsigned int 
-    payloadTypesEnumPlugin_get_serialized_sample_max_size(
+    commandModePlugin_get_serialized_sample_max_size(
         PRESTypePluginEndpointData endpoint_data,
         RTIBool include_encapsulation,
         RTIEncapsulationId encapsulation_id,
@@ -46,14 +46,14 @@ namespace cctypes {
     * -------------------------------------------------------------------------------------- */
 
     NDDSUSERDllExport extern unsigned int 
-    payloadTypesEnumPlugin_get_serialized_key_max_size(
+    commandModePlugin_get_serialized_key_max_size(
         PRESTypePluginEndpointData endpoint_data,
         RTIBool include_encapsulation,
         RTIEncapsulationId encapsulation_id,
         unsigned int current_alignment);
 
     NDDSUSERDllExport extern unsigned int 
-    payloadTypesEnumPlugin_get_serialized_key_max_size_for_keyhash(
+    commandModePlugin_get_serialized_key_max_size_for_keyhash(
         PRESTypePluginEndpointData endpoint_data,
         RTIEncapsulationId encapsulation_id,
         unsigned int current_alignment);
@@ -63,222 +63,32 @@ namespace cctypes {
     * ---------------------------------------------------------------------------- */
 
     NDDSUSERDllExport extern void
-    payloadTypesEnumPluginSupport_print_data(
-        const payloadTypesEnum *sample, const char *desc, int indent_level);
+    commandModePluginSupport_print_data(
+        const commandMode *sample, const char *desc, int indent_level);
 
     /* The type used to store keys for instances of type struct
     * AnotherSimple.
     *
-    * By default, this type is struct ccBulk
+    * By default, this type is struct ccPerf
     * itself. However, if for some reason this choice is not practical for your
-    * system (e.g. if sizeof(struct ccBulk)
+    * system (e.g. if sizeof(struct ccPerf)
     * is very large), you may redefine this typedef in terms of another type of
     * your choosing. HOWEVER, if you define the KeyHolder type to be something
     * other than struct AnotherSimple, the
     * following restriction applies: the key of struct
-    * ccBulk must consist of a
+    * ccPerf must consist of a
     * single field of your redefined KeyHolder type and that field must be the
-    * first field in struct ccBulk.
+    * first field in struct ccPerf.
     */
-    typedef  class ccBulk ccBulkKeyHolder;
-
-    #define ccBulkPlugin_get_sample PRESTypePluginDefaultEndpointData_getSample
-
-    #define ccBulkPlugin_get_buffer PRESTypePluginDefaultEndpointData_getBuffer 
-    #define ccBulkPlugin_return_buffer PRESTypePluginDefaultEndpointData_returnBuffer
-
-    #define ccBulkPlugin_get_key PRESTypePluginDefaultEndpointData_getKey 
-    #define ccBulkPlugin_return_key PRESTypePluginDefaultEndpointData_returnKey
-
-    #define ccBulkPlugin_create_sample PRESTypePluginDefaultEndpointData_createSample 
-    #define ccBulkPlugin_destroy_sample PRESTypePluginDefaultEndpointData_deleteSample 
-
-    /* --------------------------------------------------------------------------------------
-    Support functions:
-    * -------------------------------------------------------------------------------------- */
-
-    NDDSUSERDllExport extern ccBulk*
-    ccBulkPluginSupport_create_data_w_params(
-        const struct DDS_TypeAllocationParams_t * alloc_params);
-
-    NDDSUSERDllExport extern ccBulk*
-    ccBulkPluginSupport_create_data_ex(RTIBool allocate_pointers);
-
-    NDDSUSERDllExport extern ccBulk*
-    ccBulkPluginSupport_create_data(void);
-
-    NDDSUSERDllExport extern RTIBool 
-    ccBulkPluginSupport_copy_data(
-        ccBulk *out,
-        const ccBulk *in);
-
-    NDDSUSERDllExport extern void 
-    ccBulkPluginSupport_destroy_data_w_params(
-        ccBulk *sample,
-        const struct DDS_TypeDeallocationParams_t * dealloc_params);
-
-    NDDSUSERDllExport extern void 
-    ccBulkPluginSupport_destroy_data_ex(
-        ccBulk *sample,RTIBool deallocate_pointers);
-
-    NDDSUSERDllExport extern void 
-    ccBulkPluginSupport_destroy_data(
-        ccBulk *sample);
-
-    NDDSUSERDllExport extern void 
-    ccBulkPluginSupport_print_data(
-        const ccBulk *sample,
-        const char *desc,
-        unsigned int indent);
-
-    NDDSUSERDllExport extern ccBulk*
-    ccBulkPluginSupport_create_key_ex(RTIBool allocate_pointers);
-
-    NDDSUSERDllExport extern ccBulk*
-    ccBulkPluginSupport_create_key(void);
-
-    NDDSUSERDllExport extern void 
-    ccBulkPluginSupport_destroy_key_ex(
-        ccBulkKeyHolder *key,RTIBool deallocate_pointers);
-
-    NDDSUSERDllExport extern void 
-    ccBulkPluginSupport_destroy_key(
-        ccBulkKeyHolder *key);
-
-    /* ----------------------------------------------------------------------------
-    Callback functions:
-    * ---------------------------------------------------------------------------- */
-
-    NDDSUSERDllExport extern PRESTypePluginParticipantData 
-    ccBulkPlugin_on_participant_attached(
-        void *registration_data, 
-        const struct PRESTypePluginParticipantInfo *participant_info,
-        RTIBool top_level_registration, 
-        void *container_plugin_context,
-        RTICdrTypeCode *typeCode);
-
-    NDDSUSERDllExport extern void 
-    ccBulkPlugin_on_participant_detached(
-        PRESTypePluginParticipantData participant_data);
-
-    NDDSUSERDllExport extern PRESTypePluginEndpointData 
-    ccBulkPlugin_on_endpoint_attached(
-        PRESTypePluginParticipantData participant_data,
-        const struct PRESTypePluginEndpointInfo *endpoint_info,
-        RTIBool top_level_registration, 
-        void *container_plugin_context);
-
-    NDDSUSERDllExport extern void 
-    ccBulkPlugin_on_endpoint_detached(
-        PRESTypePluginEndpointData endpoint_data);
-
-    NDDSUSERDllExport extern void    
-    ccBulkPlugin_return_sample(
-        PRESTypePluginEndpointData endpoint_data,
-        ccBulk *sample,
-        void *handle);    
-
-    NDDSUSERDllExport extern RTIBool 
-    ccBulkPlugin_copy_sample(
-        PRESTypePluginEndpointData endpoint_data,
-        ccBulk *out,
-        const ccBulk *in);
-
-    /* ----------------------------------------------------------------------------
-    (De)Serialize functions:
-    * ------------------------------------------------------------------------- */
-
-    NDDSUSERDllExport extern RTIBool
-    ccBulkPlugin_serialize_to_cdr_buffer(
-        char * buffer,
-        unsigned int * length,
-        const ccBulk *sample,
-        ::dds::core::policy::DataRepresentationId representation
-        = ::dds::core::policy::DataRepresentation::xcdr()); 
-
-    NDDSUSERDllExport extern RTIBool 
-    ccBulkPlugin_deserialize(
-        PRESTypePluginEndpointData endpoint_data,
-        ccBulk **sample, 
-        RTIBool * drop_sample,
-        struct RTICdrStream *stream,
-        RTIBool deserialize_encapsulation,
-        RTIBool deserialize_sample, 
-        void *endpoint_plugin_qos);
-
-    NDDSUSERDllExport extern RTIBool
-    ccBulkPlugin_deserialize_from_cdr_buffer(
-        ccBulk *sample,
-        const char * buffer,
-        unsigned int length);    
-
-    NDDSUSERDllExport extern unsigned int 
-    ccBulkPlugin_get_serialized_sample_max_size(
-        PRESTypePluginEndpointData endpoint_data,
-        RTIBool include_encapsulation,
-        RTIEncapsulationId encapsulation_id,
-        unsigned int current_alignment);
-
-    /* --------------------------------------------------------------------------------------
-    Key Management functions:
-    * -------------------------------------------------------------------------------------- */
-    NDDSUSERDllExport extern PRESTypePluginKeyKind 
-    ccBulkPlugin_get_key_kind(void);
-
-    NDDSUSERDllExport extern unsigned int 
-    ccBulkPlugin_get_serialized_key_max_size(
-        PRESTypePluginEndpointData endpoint_data,
-        RTIBool include_encapsulation,
-        RTIEncapsulationId encapsulation_id,
-        unsigned int current_alignment);
-
-    NDDSUSERDllExport extern unsigned int 
-    ccBulkPlugin_get_serialized_key_max_size_for_keyhash(
-        PRESTypePluginEndpointData endpoint_data,
-        RTIEncapsulationId encapsulation_id,
-        unsigned int current_alignment);
-
-    NDDSUSERDllExport extern RTIBool 
-    ccBulkPlugin_deserialize_key(
-        PRESTypePluginEndpointData endpoint_data,
-        ccBulk ** sample,
-        RTIBool * drop_sample,
-        struct RTICdrStream *stream,
-        RTIBool deserialize_encapsulation,
-        RTIBool deserialize_key,
-        void *endpoint_plugin_qos);
-
-    NDDSUSERDllExport extern RTIBool 
-    ccBulkPlugin_instance_to_key(
-        PRESTypePluginEndpointData endpoint_data,
-        ccBulkKeyHolder *key, 
-        const ccBulk *instance);
-
-    NDDSUSERDllExport extern RTIBool 
-    ccBulkPlugin_key_to_instance(
-        PRESTypePluginEndpointData endpoint_data,
-        ccBulk *instance, 
-        const ccBulkKeyHolder *key);
-
-    NDDSUSERDllExport extern RTIBool 
-    ccBulkPlugin_serialized_sample_to_keyhash(
-        PRESTypePluginEndpointData endpoint_data,
-        struct RTICdrStream *stream, 
-        DDS_KeyHash_t *keyhash,
-        RTIBool deserialize_encapsulation,
-        void *endpoint_plugin_qos); 
-
-    /* Plugin Functions */
-    NDDSUSERDllExport extern struct PRESTypePlugin*
-    ccBulkPlugin_new(void);
-
-    NDDSUSERDllExport extern void
-    ccBulkPlugin_delete(struct PRESTypePlugin *);
+    typedef  class ccPerf ccPerfKeyHolder;
 
     #define ccPerfPlugin_get_sample PRESTypePluginDefaultEndpointData_getSample
 
     #define ccPerfPlugin_get_buffer PRESTypePluginDefaultEndpointData_getBuffer 
     #define ccPerfPlugin_return_buffer PRESTypePluginDefaultEndpointData_returnBuffer
+
+    #define ccPerfPlugin_get_key PRESTypePluginDefaultEndpointData_getKey 
+    #define ccPerfPlugin_return_key PRESTypePluginDefaultEndpointData_returnKey
 
     #define ccPerfPlugin_create_sample PRESTypePluginDefaultEndpointData_createSample 
     #define ccPerfPlugin_destroy_sample PRESTypePluginDefaultEndpointData_deleteSample 
@@ -320,6 +130,20 @@ namespace cctypes {
         const ccPerf *sample,
         const char *desc,
         unsigned int indent);
+
+    NDDSUSERDllExport extern ccPerf*
+    ccPerfPluginSupport_create_key_ex(RTIBool allocate_pointers);
+
+    NDDSUSERDllExport extern ccPerf*
+    ccPerfPluginSupport_create_key(void);
+
+    NDDSUSERDllExport extern void 
+    ccPerfPluginSupport_destroy_key_ex(
+        ccPerfKeyHolder *key,RTIBool deallocate_pointers);
+
+    NDDSUSERDllExport extern void 
+    ccPerfPluginSupport_destroy_key(
+        ccPerfKeyHolder *key);
 
     /* ----------------------------------------------------------------------------
     Callback functions:
@@ -424,6 +248,26 @@ namespace cctypes {
         RTIBool deserialize_key,
         void *endpoint_plugin_qos);
 
+    NDDSUSERDllExport extern RTIBool 
+    ccPerfPlugin_instance_to_key(
+        PRESTypePluginEndpointData endpoint_data,
+        ccPerfKeyHolder *key, 
+        const ccPerf *instance);
+
+    NDDSUSERDllExport extern RTIBool 
+    ccPerfPlugin_key_to_instance(
+        PRESTypePluginEndpointData endpoint_data,
+        ccPerf *instance, 
+        const ccPerfKeyHolder *key);
+
+    NDDSUSERDllExport extern RTIBool 
+    ccPerfPlugin_serialized_sample_to_keyhash(
+        PRESTypePluginEndpointData endpoint_data,
+        struct RTICdrStream *stream, 
+        DDS_KeyHash_t *keyhash,
+        RTIBool deserialize_encapsulation,
+        void *endpoint_plugin_qos); 
+
     /* Plugin Functions */
     NDDSUSERDllExport extern struct PRESTypePlugin*
     ccPerfPlugin_new(void);
@@ -431,49 +275,85 @@ namespace cctypes {
     NDDSUSERDllExport extern void
     ccPerfPlugin_delete(struct PRESTypePlugin *);
 
-    #define ccControlPlugin_get_sample PRESTypePluginDefaultEndpointData_getSample
+    /* ----------------------------------------------------------------------------
+    (De)Serialize functions:
+    * ------------------------------------------------------------------------- */
 
-    #define ccControlPlugin_get_buffer PRESTypePluginDefaultEndpointData_getBuffer 
-    #define ccControlPlugin_return_buffer PRESTypePluginDefaultEndpointData_returnBuffer
+    NDDSUSERDllExport extern unsigned int 
+    fillTypePlugin_get_serialized_sample_max_size(
+        PRESTypePluginEndpointData endpoint_data,
+        RTIBool include_encapsulation,
+        RTIEncapsulationId encapsulation_id,
+        unsigned int current_alignment);
 
-    #define ccControlPlugin_create_sample PRESTypePluginDefaultEndpointData_createSample 
-    #define ccControlPlugin_destroy_sample PRESTypePluginDefaultEndpointData_deleteSample 
+    /* --------------------------------------------------------------------------------------
+    Key Management functions:
+    * -------------------------------------------------------------------------------------- */
+
+    NDDSUSERDllExport extern unsigned int 
+    fillTypePlugin_get_serialized_key_max_size(
+        PRESTypePluginEndpointData endpoint_data,
+        RTIBool include_encapsulation,
+        RTIEncapsulationId encapsulation_id,
+        unsigned int current_alignment);
+
+    NDDSUSERDllExport extern unsigned int 
+    fillTypePlugin_get_serialized_key_max_size_for_keyhash(
+        PRESTypePluginEndpointData endpoint_data,
+        RTIEncapsulationId encapsulation_id,
+        unsigned int current_alignment);
+
+    /* ----------------------------------------------------------------------------
+    Support functions:
+    * ---------------------------------------------------------------------------- */
+
+    NDDSUSERDllExport extern void
+    fillTypePluginSupport_print_data(
+        const fillType *sample, const char *desc, int indent_level);
+
+    #define ccTestControlPlugin_get_sample PRESTypePluginDefaultEndpointData_getSample
+
+    #define ccTestControlPlugin_get_buffer PRESTypePluginDefaultEndpointData_getBuffer 
+    #define ccTestControlPlugin_return_buffer PRESTypePluginDefaultEndpointData_returnBuffer
+
+    #define ccTestControlPlugin_create_sample PRESTypePluginDefaultEndpointData_createSample 
+    #define ccTestControlPlugin_destroy_sample PRESTypePluginDefaultEndpointData_deleteSample 
 
     /* --------------------------------------------------------------------------------------
     Support functions:
     * -------------------------------------------------------------------------------------- */
 
-    NDDSUSERDllExport extern ccControl*
-    ccControlPluginSupport_create_data_w_params(
+    NDDSUSERDllExport extern ccTestControl*
+    ccTestControlPluginSupport_create_data_w_params(
         const struct DDS_TypeAllocationParams_t * alloc_params);
 
-    NDDSUSERDllExport extern ccControl*
-    ccControlPluginSupport_create_data_ex(RTIBool allocate_pointers);
+    NDDSUSERDllExport extern ccTestControl*
+    ccTestControlPluginSupport_create_data_ex(RTIBool allocate_pointers);
 
-    NDDSUSERDllExport extern ccControl*
-    ccControlPluginSupport_create_data(void);
+    NDDSUSERDllExport extern ccTestControl*
+    ccTestControlPluginSupport_create_data(void);
 
     NDDSUSERDllExport extern RTIBool 
-    ccControlPluginSupport_copy_data(
-        ccControl *out,
-        const ccControl *in);
+    ccTestControlPluginSupport_copy_data(
+        ccTestControl *out,
+        const ccTestControl *in);
 
     NDDSUSERDllExport extern void 
-    ccControlPluginSupport_destroy_data_w_params(
-        ccControl *sample,
+    ccTestControlPluginSupport_destroy_data_w_params(
+        ccTestControl *sample,
         const struct DDS_TypeDeallocationParams_t * dealloc_params);
 
     NDDSUSERDllExport extern void 
-    ccControlPluginSupport_destroy_data_ex(
-        ccControl *sample,RTIBool deallocate_pointers);
+    ccTestControlPluginSupport_destroy_data_ex(
+        ccTestControl *sample,RTIBool deallocate_pointers);
 
     NDDSUSERDllExport extern void 
-    ccControlPluginSupport_destroy_data(
-        ccControl *sample);
+    ccTestControlPluginSupport_destroy_data(
+        ccTestControl *sample);
 
     NDDSUSERDllExport extern void 
-    ccControlPluginSupport_print_data(
-        const ccControl *sample,
+    ccTestControlPluginSupport_print_data(
+        const ccTestControl *sample,
         const char *desc,
         unsigned int indent);
 
@@ -482,7 +362,7 @@ namespace cctypes {
     * ---------------------------------------------------------------------------- */
 
     NDDSUSERDllExport extern PRESTypePluginParticipantData 
-    ccControlPlugin_on_participant_attached(
+    ccTestControlPlugin_on_participant_attached(
         void *registration_data, 
         const struct PRESTypePluginParticipantInfo *participant_info,
         RTIBool top_level_registration, 
@@ -490,48 +370,48 @@ namespace cctypes {
         RTICdrTypeCode *typeCode);
 
     NDDSUSERDllExport extern void 
-    ccControlPlugin_on_participant_detached(
+    ccTestControlPlugin_on_participant_detached(
         PRESTypePluginParticipantData participant_data);
 
     NDDSUSERDllExport extern PRESTypePluginEndpointData 
-    ccControlPlugin_on_endpoint_attached(
+    ccTestControlPlugin_on_endpoint_attached(
         PRESTypePluginParticipantData participant_data,
         const struct PRESTypePluginEndpointInfo *endpoint_info,
         RTIBool top_level_registration, 
         void *container_plugin_context);
 
     NDDSUSERDllExport extern void 
-    ccControlPlugin_on_endpoint_detached(
+    ccTestControlPlugin_on_endpoint_detached(
         PRESTypePluginEndpointData endpoint_data);
 
     NDDSUSERDllExport extern void    
-    ccControlPlugin_return_sample(
+    ccTestControlPlugin_return_sample(
         PRESTypePluginEndpointData endpoint_data,
-        ccControl *sample,
+        ccTestControl *sample,
         void *handle);    
 
     NDDSUSERDllExport extern RTIBool 
-    ccControlPlugin_copy_sample(
+    ccTestControlPlugin_copy_sample(
         PRESTypePluginEndpointData endpoint_data,
-        ccControl *out,
-        const ccControl *in);
+        ccTestControl *out,
+        const ccTestControl *in);
 
     /* ----------------------------------------------------------------------------
     (De)Serialize functions:
     * ------------------------------------------------------------------------- */
 
     NDDSUSERDllExport extern RTIBool
-    ccControlPlugin_serialize_to_cdr_buffer(
+    ccTestControlPlugin_serialize_to_cdr_buffer(
         char * buffer,
         unsigned int * length,
-        const ccControl *sample,
+        const ccTestControl *sample,
         ::dds::core::policy::DataRepresentationId representation
         = ::dds::core::policy::DataRepresentation::xcdr()); 
 
     NDDSUSERDllExport extern RTIBool 
-    ccControlPlugin_deserialize(
+    ccTestControlPlugin_deserialize(
         PRESTypePluginEndpointData endpoint_data,
-        ccControl **sample, 
+        ccTestControl **sample, 
         RTIBool * drop_sample,
         struct RTICdrStream *stream,
         RTIBool deserialize_encapsulation,
@@ -539,13 +419,13 @@ namespace cctypes {
         void *endpoint_plugin_qos);
 
     NDDSUSERDllExport extern RTIBool
-    ccControlPlugin_deserialize_from_cdr_buffer(
-        ccControl *sample,
+    ccTestControlPlugin_deserialize_from_cdr_buffer(
+        ccTestControl *sample,
         const char * buffer,
         unsigned int length);    
 
     NDDSUSERDllExport extern unsigned int 
-    ccControlPlugin_get_serialized_sample_max_size(
+    ccTestControlPlugin_get_serialized_sample_max_size(
         PRESTypePluginEndpointData endpoint_data,
         RTIBool include_encapsulation,
         RTIEncapsulationId encapsulation_id,
@@ -555,25 +435,25 @@ namespace cctypes {
     Key Management functions:
     * -------------------------------------------------------------------------------------- */
     NDDSUSERDllExport extern PRESTypePluginKeyKind 
-    ccControlPlugin_get_key_kind(void);
+    ccTestControlPlugin_get_key_kind(void);
 
     NDDSUSERDllExport extern unsigned int 
-    ccControlPlugin_get_serialized_key_max_size(
+    ccTestControlPlugin_get_serialized_key_max_size(
         PRESTypePluginEndpointData endpoint_data,
         RTIBool include_encapsulation,
         RTIEncapsulationId encapsulation_id,
         unsigned int current_alignment);
 
     NDDSUSERDllExport extern unsigned int 
-    ccControlPlugin_get_serialized_key_max_size_for_keyhash(
+    ccTestControlPlugin_get_serialized_key_max_size_for_keyhash(
         PRESTypePluginEndpointData endpoint_data,
         RTIEncapsulationId encapsulation_id,
         unsigned int current_alignment);
 
     NDDSUSERDllExport extern RTIBool 
-    ccControlPlugin_deserialize_key(
+    ccTestControlPlugin_deserialize_key(
         PRESTypePluginEndpointData endpoint_data,
-        ccControl ** sample,
+        ccTestControl ** sample,
         RTIBool * drop_sample,
         struct RTICdrStream *stream,
         RTIBool deserialize_encapsulation,
@@ -582,10 +462,166 @@ namespace cctypes {
 
     /* Plugin Functions */
     NDDSUSERDllExport extern struct PRESTypePlugin*
-    ccControlPlugin_new(void);
+    ccTestControlPlugin_new(void);
 
     NDDSUSERDllExport extern void
-    ccControlPlugin_delete(struct PRESTypePlugin *);
+    ccTestControlPlugin_delete(struct PRESTypePlugin *);
+
+    #define ccTestReportPlugin_get_sample PRESTypePluginDefaultEndpointData_getSample
+
+    #define ccTestReportPlugin_get_buffer PRESTypePluginDefaultEndpointData_getBuffer 
+    #define ccTestReportPlugin_return_buffer PRESTypePluginDefaultEndpointData_returnBuffer
+
+    #define ccTestReportPlugin_create_sample PRESTypePluginDefaultEndpointData_createSample 
+    #define ccTestReportPlugin_destroy_sample PRESTypePluginDefaultEndpointData_deleteSample 
+
+    /* --------------------------------------------------------------------------------------
+    Support functions:
+    * -------------------------------------------------------------------------------------- */
+
+    NDDSUSERDllExport extern ccTestReport*
+    ccTestReportPluginSupport_create_data_w_params(
+        const struct DDS_TypeAllocationParams_t * alloc_params);
+
+    NDDSUSERDllExport extern ccTestReport*
+    ccTestReportPluginSupport_create_data_ex(RTIBool allocate_pointers);
+
+    NDDSUSERDllExport extern ccTestReport*
+    ccTestReportPluginSupport_create_data(void);
+
+    NDDSUSERDllExport extern RTIBool 
+    ccTestReportPluginSupport_copy_data(
+        ccTestReport *out,
+        const ccTestReport *in);
+
+    NDDSUSERDllExport extern void 
+    ccTestReportPluginSupport_destroy_data_w_params(
+        ccTestReport *sample,
+        const struct DDS_TypeDeallocationParams_t * dealloc_params);
+
+    NDDSUSERDllExport extern void 
+    ccTestReportPluginSupport_destroy_data_ex(
+        ccTestReport *sample,RTIBool deallocate_pointers);
+
+    NDDSUSERDllExport extern void 
+    ccTestReportPluginSupport_destroy_data(
+        ccTestReport *sample);
+
+    NDDSUSERDllExport extern void 
+    ccTestReportPluginSupport_print_data(
+        const ccTestReport *sample,
+        const char *desc,
+        unsigned int indent);
+
+    /* ----------------------------------------------------------------------------
+    Callback functions:
+    * ---------------------------------------------------------------------------- */
+
+    NDDSUSERDllExport extern PRESTypePluginParticipantData 
+    ccTestReportPlugin_on_participant_attached(
+        void *registration_data, 
+        const struct PRESTypePluginParticipantInfo *participant_info,
+        RTIBool top_level_registration, 
+        void *container_plugin_context,
+        RTICdrTypeCode *typeCode);
+
+    NDDSUSERDllExport extern void 
+    ccTestReportPlugin_on_participant_detached(
+        PRESTypePluginParticipantData participant_data);
+
+    NDDSUSERDllExport extern PRESTypePluginEndpointData 
+    ccTestReportPlugin_on_endpoint_attached(
+        PRESTypePluginParticipantData participant_data,
+        const struct PRESTypePluginEndpointInfo *endpoint_info,
+        RTIBool top_level_registration, 
+        void *container_plugin_context);
+
+    NDDSUSERDllExport extern void 
+    ccTestReportPlugin_on_endpoint_detached(
+        PRESTypePluginEndpointData endpoint_data);
+
+    NDDSUSERDllExport extern void    
+    ccTestReportPlugin_return_sample(
+        PRESTypePluginEndpointData endpoint_data,
+        ccTestReport *sample,
+        void *handle);    
+
+    NDDSUSERDllExport extern RTIBool 
+    ccTestReportPlugin_copy_sample(
+        PRESTypePluginEndpointData endpoint_data,
+        ccTestReport *out,
+        const ccTestReport *in);
+
+    /* ----------------------------------------------------------------------------
+    (De)Serialize functions:
+    * ------------------------------------------------------------------------- */
+
+    NDDSUSERDllExport extern RTIBool
+    ccTestReportPlugin_serialize_to_cdr_buffer(
+        char * buffer,
+        unsigned int * length,
+        const ccTestReport *sample,
+        ::dds::core::policy::DataRepresentationId representation
+        = ::dds::core::policy::DataRepresentation::xcdr()); 
+
+    NDDSUSERDllExport extern RTIBool 
+    ccTestReportPlugin_deserialize(
+        PRESTypePluginEndpointData endpoint_data,
+        ccTestReport **sample, 
+        RTIBool * drop_sample,
+        struct RTICdrStream *stream,
+        RTIBool deserialize_encapsulation,
+        RTIBool deserialize_sample, 
+        void *endpoint_plugin_qos);
+
+    NDDSUSERDllExport extern RTIBool
+    ccTestReportPlugin_deserialize_from_cdr_buffer(
+        ccTestReport *sample,
+        const char * buffer,
+        unsigned int length);    
+
+    NDDSUSERDllExport extern unsigned int 
+    ccTestReportPlugin_get_serialized_sample_max_size(
+        PRESTypePluginEndpointData endpoint_data,
+        RTIBool include_encapsulation,
+        RTIEncapsulationId encapsulation_id,
+        unsigned int current_alignment);
+
+    /* --------------------------------------------------------------------------------------
+    Key Management functions:
+    * -------------------------------------------------------------------------------------- */
+    NDDSUSERDllExport extern PRESTypePluginKeyKind 
+    ccTestReportPlugin_get_key_kind(void);
+
+    NDDSUSERDllExport extern unsigned int 
+    ccTestReportPlugin_get_serialized_key_max_size(
+        PRESTypePluginEndpointData endpoint_data,
+        RTIBool include_encapsulation,
+        RTIEncapsulationId encapsulation_id,
+        unsigned int current_alignment);
+
+    NDDSUSERDllExport extern unsigned int 
+    ccTestReportPlugin_get_serialized_key_max_size_for_keyhash(
+        PRESTypePluginEndpointData endpoint_data,
+        RTIEncapsulationId encapsulation_id,
+        unsigned int current_alignment);
+
+    NDDSUSERDllExport extern RTIBool 
+    ccTestReportPlugin_deserialize_key(
+        PRESTypePluginEndpointData endpoint_data,
+        ccTestReport ** sample,
+        RTIBool * drop_sample,
+        struct RTICdrStream *stream,
+        RTIBool deserialize_encapsulation,
+        RTIBool deserialize_key,
+        void *endpoint_plugin_qos);
+
+    /* Plugin Functions */
+    NDDSUSERDllExport extern struct PRESTypePlugin*
+    ccTestReportPlugin_new(void);
+
+    NDDSUSERDllExport extern void
+    ccTestReportPlugin_delete(struct PRESTypePlugin *);
 
 } /* namespace cctypes  */
 
@@ -596,5 +632,5 @@ namespace cctypes {
 #define NDDSUSERDllExport
 #endif
 
-#endif /* cctypesPlugin_751230169_h */
+#endif /* cc_str_test_typesPlugin_1867997756_h */
 

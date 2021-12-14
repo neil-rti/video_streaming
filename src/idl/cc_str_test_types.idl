@@ -1,0 +1,56 @@
+/* Data type definitions for the network test example */
+
+module cctypes {
+    // limits on element sizes
+    const uint32 MAX_SEQUENCE_LEN = 18800;
+    const uint8 KEY_STRING_LEN = 8;
+    const uint32 MAX_LATENCY_SEGMENTS = 16;
+
+    // --- types for passing between test nodes -----------------------------------------------
+    // enumeration of what type of test to run.  Also indicates data packing in ccPerf::data_payload
+    enum commandMode {
+        PING_2SEC = 0,          // 'ping' at 2-second intervals
+        REPEAT_ONLY,            // others in the chain should add tStamp, ++idx, and repeat this message only
+        MAX_CMDMODE_ENUM
+    };
+
+    // this type is for performance testing across a network/transport
+    struct ccPerf {
+        @key
+        string<KEY_STRING_LEN> pub_id;              // ID string of the HeadNode publisher
+        uint32 sequence_id;                         // sample sequence number (set by HeadNode)
+        cctypes::commandMode command_mode;          // mode of operation
+        uint16 next_data_idx;                       // index/offset for next open space in timestamp_data
+        sequence <uint8, MAX_SEQUENCE_LEN> data_payload;   // timestamps, followed by filler data
+    };
+
+    // --- types for control / status of test nodes -------------------------------------------
+    // enumeration of fill_type
+    enum fillType {
+        ALLZEROS = 0,           // init the ccPerf::data_payload with all-zeroes (compressible)
+        PRNGDATA,               // init the ccPerf::data_payload with PRNG data (non-compressible)
+        MAX_FILLTYPE_ENUM
+    };
+
+    // this type is for making changes to the testgen publisher
+    struct ccTestControl {
+        uint32 test_number;                         // assign a number to test (to be used in report)
+        cctypes::commandMode command_mode;          // mode of operation
+        cctypes::fillType data_init_type;           // what to init the ccPerf::data_payload with
+        uint32 bytes_per_sample;                    // how many bytes per DDS sample (use % 188 to match MPEG-TS)
+        uint32 bytes_per_second;                    // how many bytes per second
+        float reports_per_second;                   // rate to accumulate & publish results
+        uint32 test_duration_millisec;              // test duration in milliseconds (0=no limit), returns to 'ping' mode
+    };
+
+    struct ccTestReport {
+        uint32 test_number;                         // number of test (assigned by ccTestControl)
+        uint32 samples_total;                       // total samples since start of test
+        uint32 lost_samples_total;                  // lost samples since start of test
+        uint64 data_bytes_total;                    // data bytes sent since start of test
+        sequence<float, MAX_LATENCY_SEGMENTS> latencyMin;       // min of (2-way transport-only latency)/2
+        sequence<float, MAX_LATENCY_SEGMENTS> latencyMean;      // mean of (2-way transport-only latency)/2
+        sequence<float, MAX_LATENCY_SEGMENTS> latencyMax;       // max of (2-way transport-only latency)/2
+        sequence<float, MAX_LATENCY_SEGMENTS> latencyStdDev;    // stddev of (2-way transport-only latency)/2
+    };
+};

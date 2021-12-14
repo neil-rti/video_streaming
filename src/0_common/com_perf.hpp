@@ -1,164 +1,143 @@
 /** ----------------------------------------------------------------
  * com_perf.hpp
- * Class for measuring latency performance 
- * in the video streaming example.
+ * Class for calculating latency performance, given a vector<u64> of
+ * timestamp measurements
  **/
 #pragma once
 #include <vector>
 #include <algorithm>
 #include <stdint.h>
 
-class comPerf
+class comPerfCalc
 {
     // vars for performance (latency) measurements
-    // NPI: add monotonicity measurement too.  Do datarate per period.  Make period be adjustable (in S/mS/uS/nS)
-    /*
-        To accommodate the measurements:
-        IN:     Timestamps<4>, considered to be sequential/in-order.  Could be more or less 
-        OUT:    for each tstamp: min/mean/max/stddev of its abs time(or rate) <4>
-                for each delta:  min/mean/max/stddev of its neighbor delta (<4> if between-sample time is included)
-                datarate, samplerate for interval
-                dropped sample count
-                interval_finished
-        In-process:
-                previous timestamps
-                previous sample sequence number
-                sums/mins/maxes of latencies (period and total)
-                sum of datasizes (period and total)
-                counts of samples (period and total)
-                count of dropped samples (period and total)
-                interval duration
-                interval start time
-    */
-
-
 public:
-    comPerf() : tStampData(4), latencyMin(3), latencyMax(3), latencyMean(3), latencyStdDev(3), tStampLast(4)
+    comPerfCalc()
     {
-        latencyMin = { -99999999999 };  // minimum latency in this interval
-        latencyMax = { 0 };             // maximum latency in this interval
-        latencyMean = { 0 };            // sums of latencies in this interval
-        latencyStdDev = { 0 };          // standard deviation of latencies in this interval
-        tStampLast = { 0 };             // last-measured timestamps before measurement sendoff
-        samplesInInterval = 0;          // number of samples in measurement period
-        dataSumInInterval = 0;          // total bytes sent in period
+        intervalSampleCount = 0;        // number of samples in measurement period
+        intervalDataCount = 0;          // total bytes sent in period
         intervalActualStart = 0;        // actual start timestamp
         intervalActualDuration = 0;     // actual duration of test interval (nSec)
-        dropCount = 0;                  // total samples dropped
-        framesPerSample = 0;
-        tLatencyMin.resize(3);
-        tLatencyMax.resize(3);
-        tLatencySum.resize(3);
-        latencyMin.resize(3);
-        latencyMax.resize(3);
-        latencyMean.resize(3);
-        latencyStdDev.resize(3);
-        tStampLast.resize(4);
+        intervalSamplesLost = 0;        // total samples dropped
         perf_data_ready = false;
+        set_once = false;
+        mSampleSeqNumberPrevious = 0;   // previous sample sequence number
+        mDataSumInInterval = 0;         // total bytes sent in period
+        mSampleSumInInterval = 0;       // number of samples in measurement period
+        mSamplesDroppedInInterval = 0;  // number of samples dropped in measurement period
+        mIntervalStart = 0;             // start time
+        mIntervalDuration = 500000000;  // duration of the testing/reporting interval
+
     }
 
-    // Inputs
-    std::vector<uint64_t> tStampData;       // nSec timestamps at different points in the pipe
+FIXME: remove the 'duration' stuff from here.  Just use init()/reset() and finishCalc().
+        This should be timed/controlled externally.
+    This could also use another implementation that does histograms.   All as an include-file-only solution.
+
     // Outputs
-    std::vector<int64_t> latencyMin;        // minimum latency in this interval
-    std::vector<int64_t> latencyMax;        // maximum latency in this interval
-    std::vector<int64_t> latencyMean;       // sums of latencies in this interval
-    std::vector<uint64_t> latencyStdDev;    // standard deviation of latencies in this interval
-    std::vector<uint64_t> tStampLast;       // most-recent timestamps in the signal chain
-    uint32_t samplesInInterval;             // number of samples in measurement period
-    uint64_t dataSumInInterval;             // total bytes sent in period
+    std::vector<uint64_t> latencyMin;       // 
+    std::vector<uint64_t> latencyMean;      // 
+    std::vector<uint64_t> latencyMax;       // 
+    std::vector<uint64_t> latencyStdDev;    // 
+
     uint64_t intervalActualStart;           // start timestamp of this interval
     uint64_t intervalActualDuration;        // actual duration of test interval (nSec)
-    uint32_t dropCount;                     // total samples dropped
-    uint32_t framesPerSample;               // 188-byte frames per sample
-    bool perf_data_ready;                   // new performance data for interval is ready
+    uint64_t intervalDataCount;
+    uint32_t intervalSampleCount;
+    uint32_t intervalSamplesLost;
+    bool perf_data_ready;                   // perfdata is ready for local monitoring program, for this interval
 
+    // set test interval
+    void interval_set_nsec(uint64_t nsec) { mIntervalDuration = nsec; }
+    void interval_set_usec(uint64_t usec) { mIntervalDuration = usec * 1000; }
+    void interval_set_msec(uint64_t msec) { mIntervalDuration = msec * 1000000; }
 
-    void interval_set_nsec(uint64_t nsec) { intervalDuration = nsec; }
-    void interval_set_usec(uint64_t usec) { intervalDuration = usec * 1000; }
-    void interval_set_msec(uint64_t msec) { intervalDuration = msec * 1000000; }
+    // returns the size of the output stats vectors
+    int32_t stats_size_get(void) { return (int32_t)latencyMin.size(); }
 
-    // perf_data_new(): call this after updating the values in tStampData<>
-    void perf_data_new(uint32_t seqnum, uint32_t datasize, uint32_t dataoverhead) {
-        // is the interval over?
-        if(tStampData.at(tQty-1) > intervalEndTime) {
-            if(intervalSampleCount) {
-                // move results, signal export, reset interval vars
-                latencyMin = tLatencyMin;
-                latencyMax = tLatencyMax;
-                for(int i=0 ; i<tQty ; i++) {
-                    latencyMean.at(i) = tLatencySum.at(i) / intervalSampleCount;
-                    latencyStdDev.at(i) = 0;
-                }
-                tStampLast = tStampData;
-//                for (int i = 0; i < 4; i++) {
-//                    tStampLast.at(i) = tStampData.at(i);
-//                }
-                samplesInInterval = intervalSampleCount;
-                dataSumInInterval = intervalDataSum;
-                intervalActualDuration = tStampData.at(tQty-1) - intervalStartTime;
-                intervalActualStart = intervalStartTime;
-                framesPerSample = datasize / 188;
-                perf_data_ready = true;
-            }
-            // re-init
-            for(int i=0 ; i<tQty ; i++) {
-                tLatencyMin.at(i) = -999999999999;
-                tLatencyMax.at(i) = 0;
-                tLatencySum.at(i) = 0;
-            }
-            intervalSampleCount = 0;
-            intervalDataSum = 0;
-            intervalStartTime = tStampData.at(tQty-1);
-            intervalEndTime = intervalStartTime + intervalDuration;
-            dropCount = 0;
+    // reset the totals and vars
+    void reset_interval(void) {
+    
+    }
+
+    // init_sizes() -- call this once to set up sizes
+    void init_sizes(int32_t tStampPoints) {
+        uint64_t pointCount = tStampPoints - 1;
+        latencyMin.resize(pointCount);
+        latencyMean.resize(pointCount);
+        latencyMax.resize(pointCount);
+        latencyStdDev.resize(pointCount);
+        mLatencyMin.resize(pointCount);
+        mLatencyMax.resize(pointCount);
+        mLatencySum.resize(pointCount);
+        std::fill(mLatencyMin.begin(), mLatencyMin.end(), (uint64_t)-1);
+        std::fill(mLatencySum.begin(), mLatencySum.end(), 0);
+        std::fill(mLatencyMax.begin(), mLatencyMax.end(), 0);
+        mDataSumInInterval = 0;
+        mSampleSumInInterval = 0;
+        mSamplesDroppedInInterval = 0;
+        set_once = false;
+    }
+
+    // update the stats with a new set of timestamps; assumed that the last value will be most-recent
+    void update_stats(uint32_t seqNum, uint32_t dataSize, std::vector<uint64_t> newStamps)
+    {
+        // init on first time
+        if (false == set_once) {
+            mIntervalStart = newStamps.at(newStamps.size()-1);
+            mSampleSeqNumberPrevious = seqNum - 1;
+            set_once = true;
         }
-
-        // any dropped sequence numbers?
-        if((sampleSeqNumberPrevious != 0) && (seqnum != (sampleSeqNumberPrevious + 1))) {
-            dropCount = seqnum - sampleSeqNumberPrevious - 1;
+        // update with new values
+        for (int x = 0; x < newStamps.size()-1; x++) {
+            uint64_t tmpVal = newStamps.at(x+1) - newStamps.at(x);
+            if (tmpVal < mLatencyMin.at(x)) mLatencyMin.at(x) = tmpVal;
+            if (tmpVal > mLatencyMax.at(x)) mLatencyMax.at(x) = tmpVal;
+            mLatencySum.at(x) += tmpVal;
         }
-        sampleSeqNumberPrevious = seqnum;
+        mSampleSumInInterval++;
+        mDataSumInInterval += dataSize;
+        mSamplesDroppedInInterval += (seqNum - mSampleSeqNumberPrevious - 1);
+        mSampleSeqNumberPrevious = seqNum;
 
-        // calculate latencies (diffs between tStamps)
-        int64_t tDelta = tStampData.at(1) - tStampData.at(0);           // PQ: pub add to send buffer -to- pub send delay
-        if(tDelta < tLatencyMin.at(0)) tLatencyMin.at(0) = tDelta;
-        if(tDelta > tLatencyMax.at(0)) tLatencyMax.at(0) = tDelta;
-        tLatencySum.at(0) += tDelta;
-        
-        tDelta = tStampData.at(2) - tStampData.at(1);                   // TL1: pub send -to- sub receive delay
-        if(tDelta < tLatencyMin.at(1)) tLatencyMin.at(1) = tDelta;
-        if(tDelta > tLatencyMax.at(1)) tLatencyMax.at(1) = tDelta;
-        tLatencySum.at(1) += tDelta;
+        // is it time to calc the stats?
+        if (newStamps.at(newStamps.size() - 1) >= mIntervalStart + mIntervalDuration)
+        {
+            // transfer min/max to outputs
+            latencyMin = mLatencyMin;
+            latencyMax = mLatencyMax;
 
-        tDelta = tStampData.at(3) - tStampData.at(2);                   // SQ: sub receive -to- sub app delay
-        if(tDelta < tLatencyMin.at(2)) tLatencyMin.at(2) = tDelta;
-        if(tDelta > tLatencyMax.at(2)) tLatencyMax.at(2) = tDelta;
-        tLatencySum.at(2) += tDelta;
+            // calculate mean
+            for (auto x = 0; x < mLatencySum.size(); x++)
+            {
+                latencyMean.at(x) = mLatencySum.at(x) / mSampleSumInInterval;
+            }
 
-        // add to totals
-        totalSampleCount++;
-        intervalSampleCount++;
-        totalDataSum += (datasize + dataoverhead);
-        intervalDataSum += (datasize + dataoverhead);
+            // calculate stdDev
+            // FIXME -- later
+
+            // other values
+            intervalDataCount = mDataSumInInterval;            // total bytes sent in period
+            intervalSampleCount = mSampleSumInInterval;          // number of samples in measurement period
+            intervalSamplesLost = mSamplesDroppedInInterval;     // number of samples dropped in measurement period
+
+            // signal 
+            perf_data_ready = true;
+        }
     }
 
 
 private:
-    // internal
-    int tQty = 3;       // FIXME
-    // interval stats
-    uint64_t intervalDuration;              // duration of the testing/reporting interval
-    uint64_t intervalStartTime;             // start time (nSec) of test interval
-    uint64_t intervalEndTime;               // start+duration, here for convenience
-    uint32_t intervalSampleCount;           // number of samples in measurement period
-    uint64_t intervalDataSum;               // total bytes sent in period
-    uint32_t sampleSeqNumberPrevious;       // previous sample sequence number
-    std::vector<int64_t> tLatencyMin;      // minimum latency in this interval
-    std::vector<int64_t> tLatencyMax;      // maximum latency in this interval
-    std::vector<int64_t> tLatencySum;      // sums of latencies in this interval
+    // new
+    bool set_once;                          // used to set the size of vectors at the first call
+    std::vector<uint64_t> mLatencyMin;      // newly-added timestamps
+    std::vector<uint64_t> mLatencySum;      // newly-added timestamps
+    std::vector<uint64_t> mLatencyMax;      // newly-added timestamps
+    uint32_t mSampleSeqNumberPrevious;      // previous sample sequence number
+    uint64_t mDataSumInInterval;            // total bytes sent in period
+    uint32_t mSampleSumInInterval;          // number of samples in measurement period
+    uint32_t mSamplesDroppedInInterval;     // number of samples dropped in measurement period
+    uint64_t mIntervalStart;                // start time
+    uint64_t mIntervalDuration;             // duration of the testing/reporting interval
 
-    // total stats
-    uint32_t totalSampleCount;              // number of samples in measurement period
-    uint64_t totalDataSum;                  // total bytes sent in period
 };
