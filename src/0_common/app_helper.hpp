@@ -18,16 +18,18 @@
 #define __APP_HELPER_HPP__
 
 #include <iostream>
+#include <fstream>
 #include <csignal>
 #include <dds/core/ddscore.hpp>
-#include "toml.hpp"                 // for config file I/O
+#include "property_util.h"          // for reading from a named config/property file.
+
 
 namespace application {
 
     // Catch control-C and tell application to shut down
     bool shutdown_requested = false;
 
-    const std::string config_filename_default = "config.toml";
+    const std::string config_filename_default = "config.properties";
 
     inline void stop_handler(int)
     {
@@ -133,30 +135,15 @@ namespace application {
             }
         }
 
-        // try opening the config file
-        bool config_file_exists = true;
-        toml::value cfgfiledata;
-        try {
-            cfgfiledata = toml::parse(config_filename);
-        } catch(const std::runtime_error& e) {
-            config_file_exists = false;
-        }
-        if (config_file_exists) {
-            if (cfgfiledata.contains("domain")) {
-                domain_id = toml::find_or<unsigned int>(cfgfiledata, "domain", 0);
-            }
-            if (cfgfiledata.contains("this_station_name")) {
-                this_station_name = toml::find_or<std::string>(cfgfiledata, "this_station_name", "cfgfile_type_error");
-            }
-            if (cfgfiledata.contains("data_sample_size")) {
-                data_sample_size = toml::find_or<uint32_t>(cfgfiledata, "data_sample_size", 1111);
-            }
-            if (cfgfiledata.contains("from_station_name")) {
-                from_station_name = toml::find_or<std::string>(cfgfiledata, "from_station_name", "cfgfile_type_error");
-                is_vid_pub = false;
-            }
-        }
-
+        // load properties from file
+        PropertyUtil* prop = new PropertyUtil(config_filename);
+        domain_id = prop->getIntProperty("config.domainId");
+        data_sample_size = prop->getIntProperty("config.data_sample_size");
+        if(data_sample_size == 0) data_sample_size = 1316;
+        this_station_name = prop->getStringProperty("config.this_station_name");
+        if(this_station_name == "") this_station_name = "ThisStationDefaultName";
+        from_station_name = prop->getStringProperty("config.from_station_name");
+        if(from_station_name == "") from_station_name = "FromStationDefaultName";
 
         // 1: parse the command line args
         arg_processing = 1;
@@ -252,18 +239,21 @@ namespace application {
 
         // write-back the config file if asked
         if(writeback_config_file) {
-            cfgfiledata["domain"] = domain_id;
-            cfgfiledata["this_station_name"] = this_station_name;
-            cfgfiledata["data_sample_size"] = data_sample_size;
-            cfgfiledata["from_station_name"] = from_station_name;
-
+            std::map<const std::string, std::string> tmpMap = prop->getPropertyMap();
+            tmpMap["config.data_sample_size"] = std::to_string(data_sample_size);
+            tmpMap["config.domainId"] = std::to_string(domain_id);
+            tmpMap["config.from_station_name"] = this_station_name;
+            tmpMap["config.this_station_name"] = from_station_name;
             std::ofstream fout(config_filename);
             if(fout) {
-                fout << cfgfiledata << std::endl;
+                for (auto kv : tmpMap) {
+                    fout << kv.first << "=" << kv.second << std::endl;
+                }
             }
             else {
                 std::cerr << "Write-back failure to file " << config_filename << std::endl;
             }
+
         }
 
         return ApplicationArguments(

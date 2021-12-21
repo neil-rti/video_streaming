@@ -1,6 +1,0 @@
-# example configuration file
-
-domain = 0
-this_station_name = "Dell XPS"
-data_sample_size = 1504
-from_station_name = "Pub-Station"
