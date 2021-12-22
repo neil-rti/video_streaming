@@ -30,9 +30,9 @@ public:
 
     }
 
-FIXME: remove the 'duration' stuff from here.  Just use init()/reset() and finishCalc().
-        This should be timed/controlled externally.
-    This could also use another implementation that does histograms.   All as an include-file-only solution.
+//FIXME: remove the 'duration' stuff from here.  Just use init()/reset() and finishCalc().
+//        This should be timed/controlled externally.
+//    This could also use another implementation that does histograms.   All as an include-file-only solution.
 
     // Outputs
     std::vector<uint64_t> latencyMin;       // 

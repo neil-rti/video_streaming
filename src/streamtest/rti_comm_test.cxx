@@ -9,6 +9,14 @@
 * any incidental or consequential damages arising out of the use or inability
 * to use the software.
 */
+/**
+ * rti_comm_test -- wrappers for the data type support of testing a 
+ * streaming video connection. The types supported in this file are for:
+ *  rtiComPerf: class wrapper for the testing payload; this is sent between
+ *          publisher and subscriber, across the streaming video transport.
+ *  rtiComTestControl: class wrapper for controlling the test publisher
+ *  rtiComTestReport: class wrapper for getting the test results.
+ **/
 #include "rti_comm_test.hpp"
 
  /** ----------------------------------------------------------------

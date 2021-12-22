@@ -25,7 +25,7 @@
 #include "com_perf.hpp"           // for latency measurement
 #include "app_helper.hpp"         // for command line args and signals
 
-// point to perf publisher class
+// pointer to perf publisher class
 rtiComPerf* gMyPerfPub = NULL;
 std::string gMyNodeId;
 uint64_t gTSubRcv = 0;
@@ -73,7 +73,7 @@ int perfDataRcv_callback(dds::sub::DataReader<cctypes::ccPerf > reader)
                     newStamps.push_back(sample.data().data_payload().at(j));
                 }
                 newStamps.push_back(tNow);
-                gMyPerfCalc.update_stats(sample.data().sequence_id(), sample.data().data_payload().size(), newStamps);
+                gMyPerfCalc.update_stats(sample.data().sequence_id(), (uint32_t)sample.data().data_payload().size(), newStamps);
             }
             else {  // otherwise, update and re-publish the sample
                 gTSubRcv = tNow;
