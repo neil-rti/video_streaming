@@ -24,7 +24,7 @@ include_directories("src" "src/idl" "src/common" ${CONNEXTDDS_INCLUDE_DIRS})
 # streamvid : video streaming with FFMPEG (external using udp)
 add_executable(streamvid 
   src/streamvid/stream_vid.cxx
-  src/streamvid/rti_comms.cxx
+  src/common/rti_comms.cxx
   src/common/murmurhash3.cpp
   src/common/property_util.cxx
   src/idl/cc_str_com_types.cxx
@@ -34,9 +34,9 @@ target_link_libraries(streamvid PUBLIC RTIConnextDDS::cpp2_api)
 # streamtest : performance monitoring of video streaming example
 add_executable(streamtest 
   src/streamtest/stream_test.cxx
-  src/streamtest/rti_comm_test.cxx
+  src/common/rti_comms.cxx
   src/common/murmurhash3.cpp
   src/common/property_util.cxx
-  src/idl/cc_str_test_types.cxx
-  src/idl/cc_str_test_typesPlugin.cxx)
+  src/idl/cc_str_com_types.cxx
+  src/idl/cc_str_com_typesPlugin.cxx)
 target_link_libraries(streamtest PUBLIC RTIConnextDDS::cpp2_api)

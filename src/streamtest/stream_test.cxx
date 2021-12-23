@@ -15,155 +15,77 @@
  **/
 #include <algorithm>
 #include <iostream>
-#include <thread>                 // thread for UDP input from ffmpeg(blocking)
+#include <thread>                   // thread for UDP input from ffmpeg(blocking)
 #include <mutex>
 #include <condition_variable>
-#include <signal.h>               // ctrl-c handler
-#include <rti/util/util.hpp>      // for sleep()
-#include "rti_comm_test.hpp"      // for Connext pub/sub
-#include "murmurhash3.h"          // for hashing
-#include "com_perf.hpp"           // for latency measurement
-#include "app_helper.hpp"         // for command line args and signals
+#include <signal.h>                 // ctrl-c handler
+#include <rti/util/util.hpp>        // for sleep()
+#include "rti_comms.hpp"            // for Connext pub/sub
+#include "murmurhash3.h"            // for hashing
+#include "com_perf.hpp"             // for latency measurement
+#include "streamtest/app_helper.hpp"    // for command line args and signals
 
-// pointer to perf publisher class
-rtiComPerf* gMyPerfPub = NULL;
-std::string gMyNodeId;
-uint64_t gTSubRcv = 0;
-
-// perf calculation class
-comPerfCalc gMyPerfCalc;
-
-char* tmpBuf;
-const int tmpBufMax = 131072;
-int inx, outx, rollx;
-uint64_t intot, outtot;
-std::condition_variable cv;
-std::mutex mtx;
-uint32_t testGenDataRate = 0;
+// a few globals for expediency
+comPerfCalc gMyPerfCalc;            // class for accumulating latency test results
+rtiComms* gMyPerfPub = NULL;        // pointer to DDS publisher instance
+std::string gMyNodeId;              // my node ID, in hashed form
+uint64_t gTSubRcv = 0;              // timestamp of most-recent subscriber sample received
+uint64_t gTSPrevLink[2] = { 0 };    // timestamps (pub, sub) of the previous transport in test loop
+bool gForwardOnly = false;          // if true, don't initiate any pub action (other than forwarding rcv'd samples)
 
 
 /** ----------------------------------------------------------------
  * perfDataRcv_callback()
- * Callback for received performance samples from vidSub
+ * Callback for received performance samples from the far end
+ * If sample pub_id != myId, then add my timestamps, re-publish the data,
+ *     and calc/show transport latency
+ * else sample pub_id == myId: copy the last 2 timestamps to the first 2
+ *     in a new sample to pub, reset idx, and calc/show transport latency.
  **/
-int perfDataRcv_callback(dds::sub::DataReader<cctypes::ccPerf > reader)
+int perfDataRcv_callback(dds::sub::DataReader<cctypes::ccBulk > reader)
 {
     int count = 0;
-    dds::sub::LoanedSamples<cctypes::ccPerf> samples = reader.take();
+    dds::sub::LoanedSamples<cctypes::ccBulk> samples = reader.take();
     for (const auto& sample : samples) {
         if (sample.info().valid()) {
+
+            // get high-res timestamp
             uint64_t tNow = tstamp_u64_get();
-            // if this sample's pub_id == myID, then update stats
+            gTSubRcv = tNow;
+
+            // update the stats for this interval
+            uint8_t myMode = gMyPerfCalc.update_stats(tNow, sample.data().data().data(), sample.data().data().size());
+            gForwardOnly = (myMode != 0);
+
+            // now either forward or retire the sample
+            uint32_t idxAndMode = *(uint32_t*)(sample.data().data().data() + 4);
+            uint32_t nextIdx = idxAndMode & 0xfff;
             if (sample.data().pub_id() == gMyNodeId) {
-#if 0
-                fprintf(stdout, "Sub: seqId %u, idx: %u, data:\n", sample.data().sequence_id(), sample.data().next_data_idx());
-                uint64_t* tmpDp = (uint64_t*)sample.data().data_payload().data();
-                fprintf(stdout, "%llu\n%llu\n%llu\n%llu\n",
-                    tmpDp[0], tmpDp[1], tmpDp[2], tNow
-                );
-                fprintf(stdout, "average: %llu, size: %lld\n", ((tNow - tmpDp[2]) + (tmpDp[1] - tmpDp[0])) / 2,
-                    sample.data().data_payload().size());
-                // FIXME: call the stats class here
-#endif
-                // pass to class: sequence<u64> of timestamps.  Have method to reset period, access results.
-                std::vector<uint64_t> newStamps;
-                int j = 0;
-                for (; j < sample.data().data_payload().size(); j++)
-                {
-                    newStamps.push_back(sample.data().data_payload().at(j));
-                }
-                newStamps.push_back(tNow);
-                gMyPerfCalc.update_stats(sample.data().sequence_id(), (uint32_t)sample.data().data_payload().size(), newStamps);
-            }
-            else {  // otherwise, update and re-publish the sample
-                gTSubRcv = tNow;
-                cctypes::ccPerf tmpSample = sample;
-                memcpy(tmpSample.data_payload().data() + tmpSample.next_data_idx(), &gTSubRcv, sizeof(uint64_t));
+                // this sample did not come from me; re-publish it with my timestamps added, update the idx
+                cctypes::ccBulk tmpSample = sample;
+                idxAndMode = (idxAndMode & 0xf000) | (nextIdx + (2 * sizeof(uint64_t)));
+                memcpy(tmpSample.data().data() + 4, &idxAndMode, sizeof(uint32_t));
+                memcpy(tmpSample.data().data() + nextIdx, &tNow, sizeof(uint64_t));
+
+                // a new timestamp right before publishing
                 tNow = tstamp_u64_get();
-                memcpy(tmpSample.data_payload().data() + tmpSample.next_data_idx() + sizeof(uint64_t), &tNow, sizeof(uint64_t));
-                tmpSample.next_data_idx() = tmpSample.next_data_idx() + (2 * sizeof(uint64_t));
+                memcpy(tmpSample.data().data() + nextIdx + sizeof(uint64_t), &tNow, sizeof(uint64_t));
                 gMyPerfPub->publish(tmpSample);
+            }
+            else {
+                // this sample came from me; retire it
+                // copy only the last 2 timestamps to be available for the start of my own next pub sample
+                nextIdx -= sizeof(uint64_t);
+                if (nextIdx >= 8) {
+                    gTSPrevLink[0] = *(uint64_t*)(sample.data().data().data() + nextIdx);
+                    gTSPrevLink[1] = tNow;
+                }
             }
             count++;
         }
     }
     return count;
 }
-
-
-
-/** ----------------------------------------------------------------
- * test_datagen_thread()
- * Thread for generating noisy (hashed) data at a settable rate.
- * This data is NOT usable video content; 
- * This is to be used for capacity testing of the network link 
- * between video publisher and subscriber.
- **/
-void test_datagen_thread(void)
-{
-    // to use:
-    // char* tmpBuf;
-    // const int tmpBufMax = 131072;
-    // int inx, outx, rollx;
-    // uint64_t intot, outtot;
-    // std::condition_variable cv;
-    // std::mutex mtx;
-    // uint32_t testGenDataRate = 0;
-
-    uint32_t seqNumber = 0;
-    uint64_t seqHash[2];
-    uint32_t hashSeed = 0x0ec3d821;   // no significance to this number, other that it is prime
-    // this thread uses the RTI sleep() function to yield for 10mS (100Hz)
-    while (false == application::shutdown_requested)
-    {
-        // testGenDataRate == data rate in bytes per second
-        int32_t packetsThisPeriod = (testGenDataRate / 100) / 188;
-        if (packetsThisPeriod > 0) {
-
-            int32_t packetSendCount = packetsThisPeriod;
-
-            while (packetSendCount > 0) {
-                // put the seqNumber in first, for each 188-byte 'packet'
-                memcpy(&tmpBuf[inx], &seqNumber, sizeof(uint32_t));
-
-                // for fun, fake like it's an MPEG-TS header (first 4 bytes) FIXME: delete this.
-                tmpBuf[inx] = 0x47;         // sync byte
-                tmpBuf[inx + 1] = 0x01;     // 3 signal bits + start of the PID
-                tmpBuf[inx + 2] = 0x00;     // rest of the PID + 4 signal bits
-                tmpBuf[inx + 3] = (uint8_t)(seqNumber & 0xf);   // continuity counter
-
-                inx += sizeof(uint32_t);
-
-                // mmh3 returns a 16-byte result; copy repeatedly into remaining 184 bytes
-                MurmurHash3_x64_128(&seqNumber, sizeof(uint32_t), hashSeed, &seqHash);
-                for (auto j = 0; j < 176; j += 16) {
-                    memcpy(&tmpBuf[inx + j], seqHash, 16);
-                }
-                inx += 176;
-                memcpy(&tmpBuf[inx], seqHash, 8);
-
-                seqNumber++;
-                packetSendCount--;
-
-                // are we getting close to the end of the tmpBuf array?
-                if (inx + 188 >= tmpBufMax) {
-                    rollx = inx;
-                    inx = 0;
-                }
-            }
-
-            intot += (packetsThisPeriod * 188);
-
-            // notify pub loop: there is data to send
-            std::lock_guard<std::mutex> lk(mtx);
-            cv.notify_one();
-        }
-
-        // yield the CPU for 10mS
-        rti::util::sleep(dds::core::Duration(0, 10000000));
-    }
-}
-
 
 
 /** ----------------------------------------------------------------
@@ -173,34 +95,43 @@ void participant_main(application::ApplicationArguments args)
 {
     // setup ----------------------------------------------------
     // convert names to ID strings (used as DDS topic name)
-    std::string myId, fromId;
-    application::contact_name_to_id(args.this_station_name, myId);
+    std::string fromId;
+    application::contact_name_to_id(args.this_station_name, gMyNodeId);
     application::contact_name_to_id(args.from_station_name, fromId);
-    fprintf(stderr, "This Station: [%s], '%s'\n", myId.c_str(), args.this_station_name.c_str());
+    fprintf(stderr, "This Station: [%s], '%s'\n", gMyNodeId.c_str(), args.this_station_name.c_str());
     fprintf(stderr, "From Station: [%s], '%s'\n", fromId.c_str(), args.from_station_name.c_str());
-    gMyNodeId = myId;
 
     // Create a DomainParticipant with default Qos
     dds::domain::DomainParticipant participant(args.domain_id);
 
-    // create ccPerf publisher and subscriber; these will be on different-named topics
+    // create ccBulk publisher and subscriber; these will be on different-named topics
     dds::core::cond::WaitSet waitset;
-    rtiComPerf perfPub(std::string("l" + myId), CTRL_PUB_BE, participant);
-    perfPub.pub_sample_data_payload_buffer_size(args.data_sample_size);
+    rtiComms perfPub(std::string("t" + gMyNodeId), CTRL_PUB_BE, participant);
     gMyPerfPub = &perfPub;
-    rtiComPerf perfSub(std::string("l" + fromId), CTRL_SUB_BE, participant, &waitset, &perfDataRcv_callback);
+    rtiComms perfSub(std::string("t" + fromId), CTRL_SUB_BE, participant, &waitset, &perfDataRcv_callback);
 
-    // create ccTestCtrl sub and ccTestReport pub
-    //rtiComTestControl testCtrlSub(std::string("testControl"), CTRL_SUB_BE, participant, &waitset);
-    //rtiComTestReport testReportPub(std::string("testReport"), CTRL_PUB_BE, participant);
+    // were any sweep parms set in the config file?
+    uint8_t testMode = 0;
+    enum loopCfgEnum {
+        LOOP_NONE = 0,
+        LOOP_PUBSIZE,
+        LOOP_PUBRATE,
+        LOOP_DATARATE
+    };
+    loopCfgEnum innerCfg, outerCfg;
+    if (args.loopInnerSteps) {
+        testMode = 1;
+        if (args.loopInnerWhat == "pubsize") innerCfg = LOOP_PUBSIZE;
+        else if (args.loopInnerWhat == "pubrate") innerCfg = LOOP_PUBRATE;
+        else if (args.loopInnerWhat == "datarate") innerCfg = LOOP_DATARATE;
+        else innerCfg = LOOP_NONE;
+        if (args.loopOuterWhat == "pubsize") outerCfg = LOOP_PUBSIZE;
+        else if (args.loopOuterWhat == "pubrate") outerCfg = LOOP_PUBRATE;
+        else if (args.loopOuterWhat == "datarate") outerCfg = LOOP_DATARATE;
+        else outerCfg = LOOP_NONE;
+    }
 
-    // init a class for processing the latency data / get stats
-    // FIXME: do this in a class
-
-    gMyPerfCalc.init_sizes(4);
-    
-
-    cctypes::commandMode testMode = cctypes::commandMode::PING_2SEC;
+    //cctypes::commandMode testMode = cctypes::commandMode::PING_2SEC;
     uint64_t pingRateNs = 2000000000;        // 2-second ping rate
     uint64_t tNextPingPub = tstamp_u64_get() + pingRateNs;
     uint32_t seqNum = 0;
@@ -211,17 +142,20 @@ void participant_main(application::ApplicationArguments args)
         uint64_t tLoop = tstamp_u64_get();
 
         // check our mode
-        if (testMode == cctypes::commandMode::PING_2SEC)
+        if (testMode == 0)      // ping every 2 seconds
         {
             // publish a ping every pingInterval
             if (tLoop >= tNextPingPub) {
                 // publish a ping packet
-                perfPub.pub_sample_pub_id(myId);
-                perfPub.pub_sample_command_mode(cctypes::commandMode::PING_2SEC);
-                perfPub.pub_sample_sequence_id(seqNum);
-                memcpy(perfPub.pub_sample_data_payload_buffer() + (0 * sizeof(uint64_t)), &tLoop, sizeof(uint64_t));
-                perfPub.pub_sample_next_data_idx(1 * sizeof(uint64_t));
-                perfPub.publish();
+                cctypes::ccBulk pubSample;
+                // my ID, sequence number, index, and timestamps of previous link in loop
+                pubSample.pub_id(gMyNodeId);
+                memcpy(pubSample.data().data(), &seqNum, sizeof(uint32_t));
+                uint32_t tmpIdx = 8 + (2 * sizeof(uint64_t));
+                memcpy(pubSample.data().data() + sizeof(uint32_t), &tmpIdx, sizeof(uint32_t));
+                memcpy(pubSample.data().data() + 8, &gTSPrevLink[0], sizeof(uint64_t));
+                memcpy(pubSample.data().data() + 8 + sizeof(uint64_t), &gTSPrevLink[1], sizeof(uint64_t));
+                perfPub.publish(pubSample);
 
                 // set the next interval for now + pingRateNs                
                 tNextPingPub = tLoop + pingRateNs;
@@ -239,6 +173,83 @@ void participant_main(application::ApplicationArguments args)
                     }
                 }
                 seqNum++;
+            }
+        }
+        else {
+            // run a sweep test of some sort; stay here until complete or timeout
+            bool inloop = true;
+            bool updateOuter = true;
+            int32_t outNow = args.loopOuterStart;
+            int32_t outStep = 0;
+            int32_t inNow = args.loopInnerStart;
+            int32_t inStep = 0;
+            uint64_t timeBetweenPubsNs;
+            uint32_t loopDataRate;
+            while (inloop || false == application::shutdown_requested) {
+                tLoop = tstamp_u64_get();
+
+                // outer loop
+                if ((outStep <= args.loopOuterSteps) && (updateOuter)) {
+                    // set what needs setting
+                    if (outerCfg == LOOP_PUBSIZE) {
+                        perfPub.pub_sample_data_size_set(outNow);
+                    }
+                    else if (outerCfg == LOOP_PUBRATE) {
+                        // pub rate is in samples per second
+                        timeBetweenPubsNs = 1000000000 / outNow;
+                    }
+                    else if (outerCfg == LOOP_DATARATE) {
+                        // datarate is in bytes per second
+                        loopDataRate = outNow;
+                    }
+
+                    outStep++;
+                    if (args.loopOuterSteps) {
+                        // FIXME: scale this up to get better integer math rounding
+                        outNow = ((outStep * (args.loopOuterStop - args.loopOuterStart)) / args.loopOuterSteps) + args.loopOuterStart;
+                    }
+                    updateOuter = false;
+                }
+
+                // inner loop
+                if (innerCfg == LOOP_PUBSIZE) {
+                    perfPub.pub_sample_data_size_set(inNow);
+                }
+                else if (innerCfg == LOOP_PUBRATE) {
+                    // pub rate is in samples per second
+                    timeBetweenPubsNs = 1000000000 / inNow;
+                }
+                else if (innerCfg == LOOP_DATARATE) {
+                    // datarate is in bytes per second
+                    // adjust the value that's not in the outer loop
+                    if (outerCfg == LOOP_PUBRATE) {
+                        // adjust the pubsize at this pubrate to meet this datarate
+                    }
+                    else if (outerCfg == LOOP_PUBSIZE) {
+                        // adjust the pubrate at this pubsize to meet this datarate
+                    }
+                    loopDataRate = inNow;   // not needed?
+                }
+
+                inStep++;
+                if (inStep >= args.loopInnerSteps) {
+                    if (outStep > args.loopOuterSteps) {
+                        // finished with test
+                        inloop = false;
+                    }
+                    else {
+                        // loop again
+                        inNow = args.loopInnerStart;
+                        inStep = 0;
+                        updateOuter = true;
+                    }
+                }
+                else {
+                    // update the controlled value
+                    // FIXME: scale this up to get better integer math rounding
+                    // inNow = ((inStep * (args.loopInnerStop - args.loopInnerStart)) / args.loopInnerSteps) + args.loopInnerStart;
+                    inNow = ((((10 * inStep * (args.loopInnerStop - args.loopInnerStart)) / args.loopInnerSteps) + 5) / 10) + args.loopInnerStart;
+                }
             }
         }
 

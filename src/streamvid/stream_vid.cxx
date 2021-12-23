@@ -36,7 +36,7 @@
 #include <rti/util/util.hpp>        // for sleep() 
 #include "rti_comms.hpp"            // for Connext DDS pub/sub of bulk streaming topic
 #include "murmurhash3.h"            // for hashing
-#include "app_helper.hpp"           // for command line args and signals, name hashing
+#include "streamvid/app_helper.hpp"           // for command line args and signals, name hashing
 
 // This sets the UDP socket connection between FFMPEG/FFPLAY and this example
 std::string hostname("127.0.0.1");

@@ -14,130 +14,111 @@ class comPerfCalc
 public:
     comPerfCalc()
     {
-        intervalSampleCount = 0;        // number of samples in measurement period
-        intervalDataCount = 0;          // total bytes sent in period
-        intervalActualStart = 0;        // actual start timestamp
-        intervalActualDuration = 0;     // actual duration of test interval (nSec)
-        intervalSamplesLost = 0;        // total samples dropped
         perf_data_ready = false;
-        set_once = false;
-        mSampleSeqNumberPrevious = 0;   // previous sample sequence number
-        mDataSumInInterval = 0;         // total bytes sent in period
-        mSampleSumInInterval = 0;       // number of samples in measurement period
-        mSamplesDroppedInInterval = 0;  // number of samples dropped in measurement period
-        mIntervalStart = 0;             // start time
-        mIntervalDuration = 500000000;  // duration of the testing/reporting interval
-
+        mIntervalEnd = 0;
+        mIntervalDuration = 500000000;
+        mTransStats.dataSizeMean = 0;
+        mTransStats.dataSizeSum = 0;
+        mTransStats.droppedSamples = 0;
+        mTransStats.intervalNsec = 0;
+        mTransStats.latMax = 0;
+        mTransStats.latMean = 0;
+        mTransStats.latMin = 999999999999999;
+        mTransStats.latSampCount = 0;
+        mTransStats.latSampSum = 0;
     }
 
-//FIXME: remove the 'duration' stuff from here.  Just use init()/reset() and finishCalc().
-//        This should be timed/controlled externally.
-//    This could also use another implementation that does histograms.   All as an include-file-only solution.
-
+    struct transStats {
+        int64_t     latMin;
+        int64_t     latMean;
+        int64_t     latMax;
+        int64_t     latSampCount;
+        int64_t     latSampSum;
+        int64_t     dataSizeMean;
+        int64_t     dataSizeSum;
+        int32_t     droppedSamples;
+        uint64_t    intervalNsec;
+    };
     // Outputs
-    std::vector<uint64_t> latencyMin;       // 
-    std::vector<uint64_t> latencyMean;      // 
-    std::vector<uint64_t> latencyMax;       // 
-    std::vector<uint64_t> latencyStdDev;    // 
-
-    uint64_t intervalActualStart;           // start timestamp of this interval
-    uint64_t intervalActualDuration;        // actual duration of test interval (nSec)
-    uint64_t intervalDataCount;
-    uint32_t intervalSampleCount;
-    uint32_t intervalSamplesLost;
+    std::vector<transStats> transportStats;
     bool perf_data_ready;                   // perfdata is ready for local monitoring program, for this interval
 
-    // set test interval
-    void interval_set_nsec(uint64_t nsec) { mIntervalDuration = nsec; }
-    void interval_set_usec(uint64_t usec) { mIntervalDuration = usec * 1000; }
-    void interval_set_msec(uint64_t msec) { mIntervalDuration = msec * 1000000; }
 
-    // returns the size of the output stats vectors
-    int32_t stats_size_get(void) { return (int32_t)latencyMin.size(); }
-
-    // reset the totals and vars
-    void reset_interval(void) {
-    
+    // start test interval w/duration
+    void interval_start_nsec(uint64_t nsec) { 
+        mIntervalDuration = nsec; 
+        mIntervalEnd = tstamp_u64_get() + mIntervalDuration;
+  }
+    void interval_start_usec(uint64_t usec) { 
+        mIntervalDuration = usec * 1000; 
+        mIntervalEnd = tstamp_u64_get() + mIntervalDuration;
+    }
+    void interval_start_msec(uint64_t msec) { 
+        mIntervalDuration = msec * 1000000; 
+        mIntervalEnd = tstamp_u64_get() + mIntervalDuration;
     }
 
-    // init_sizes() -- call this once to set up sizes
-    void init_sizes(int32_t tStampPoints) {
-        uint64_t pointCount = tStampPoints - 1;
-        latencyMin.resize(pointCount);
-        latencyMean.resize(pointCount);
-        latencyMax.resize(pointCount);
-        latencyStdDev.resize(pointCount);
-        mLatencyMin.resize(pointCount);
-        mLatencyMax.resize(pointCount);
-        mLatencySum.resize(pointCount);
-        std::fill(mLatencyMin.begin(), mLatencyMin.end(), (uint64_t)-1);
-        std::fill(mLatencySum.begin(), mLatencySum.end(), 0);
-        std::fill(mLatencyMax.begin(), mLatencyMax.end(), 0);
-        mDataSumInInterval = 0;
-        mSampleSumInInterval = 0;
-        mSamplesDroppedInInterval = 0;
-        set_once = false;
-    }
 
-    // update the stats with a new set of timestamps; assumed that the last value will be most-recent
-    void update_stats(uint32_t seqNum, uint32_t dataSize, std::vector<uint64_t> newStamps)
+    // update the stats with a new set of timestamps
+    uint8_t update_stats(uint64_t tLast, const uint8_t *newStamps, uint32_t dataSize)
     {
-        // init on first time
-        if (false == set_once) {
-            mIntervalStart = newStamps.at(newStamps.size()-1);
-            mSampleSeqNumberPrevious = seqNum - 1;
-            set_once = true;
-        }
-        // update with new values
-        for (int x = 0; x < newStamps.size()-1; x++) {
-            uint64_t tmpVal = newStamps.at(x+1) - newStamps.at(x);
-            if (tmpVal < mLatencyMin.at(x)) mLatencyMin.at(x) = tmpVal;
-            if (tmpVal > mLatencyMax.at(x)) mLatencyMax.at(x) = tmpVal;
-            mLatencySum.at(x) += tmpVal;
-        }
-        mSampleSumInInterval++;
-        mDataSumInInterval += dataSize;
-        mSamplesDroppedInInterval += (seqNum - mSampleSeqNumberPrevious - 1);
-        mSampleSeqNumberPrevious = seqNum;
+        // bytes[7:0] have meta info
+        uint32_t seqNum = *(uint32_t*)(newStamps + 0);  // sequence number [3:0]
+        uint32_t tmpVal = *(uint32_t*)(newStamps + 4);
+        uint32_t nextIdx = tmpVal & 0xfff;              // next open index [6:4]
+        uint8_t  myMode = tmpVal >> 24;                 // operating mode  [7]
 
-        // is it time to calc the stats?
-        if (newStamps.at(newStamps.size() - 1) >= mIntervalStart + mIntervalDuration)
+        // for each link timestamp pair, get (latency+clockOffset) from pub-sub
+        // most-recent link is timed from tLast - (last timestamp in newStamps)
+        int64_t latencyAndClockOffsetSum = tLast - (*(uint64_t*)(newStamps + nextIdx - sizeof(uint64_t)));
+        int32_t linkCount = 1;
+        // now get the remaining link times
+        uint32_t tmpIdx = nextIdx - (3 * sizeof(uint64_t));
+        while (tmpIdx >= (8 + (2 * sizeof(uint64_t)))) {
+            // add the (latency + clock offset) of this link to the running sum
+            latencyAndClockOffsetSum += (*(uint64_t*)(newStamps + tmpIdx)) - (*(uint64_t*)(newStamps + tmpIdx + sizeof(uint64_t)));
+            linkCount++;
+            tmpIdx -= (2 * sizeof(uint64_t));
+        }
+
+        // in a 2-tester loop, the clock offsets will cancel each other out,
+        // leaving us with just the transport latency (x2)
+        int64_t transportLatencyAverage = latencyAndClockOffsetSum / linkCount;
+
+        // put into sum/min/max values and update the count
+        mTransStats.latSampSum += transportLatencyAverage;
+        if (transportLatencyAverage < mTransStats.latMin) mTransStats.latMin = transportLatencyAverage;
+        if (transportLatencyAverage > mTransStats.latMax) mTransStats.latMax = transportLatencyAverage;
+        mTransStats.latSampCount++;
+        mTransStats.dataSizeSum += dataSize;
+
+        // check if interval is finished
+        if (tLast > mIntervalEnd)
         {
-            // transfer min/max to outputs
-            latencyMin = mLatencyMin;
-            latencyMax = mLatencyMax;
-
-            // calculate mean
-            for (auto x = 0; x < mLatencySum.size(); x++)
-            {
-                latencyMean.at(x) = mLatencySum.at(x) / mSampleSumInInterval;
-            }
-
-            // calculate stdDev
-            // FIXME -- later
-
-            // other values
-            intervalDataCount = mDataSumInInterval;            // total bytes sent in period
-            intervalSampleCount = mSampleSumInInterval;          // number of samples in measurement period
-            intervalSamplesLost = mSamplesDroppedInInterval;     // number of samples dropped in measurement period
-
-            // signal 
+            // move [min/max/sum/count/size/lost] values to export and re-init
+            mTransStats.latMean = mTransStats.latSampSum / mTransStats.latSampCount;
+            mTransStats.dataSizeMean = mTransStats.dataSizeSum / mTransStats.latSampCount;
+            mTransStats.intervalNsec = mIntervalDuration;
+            transportStats.push_back(mTransStats);
             perf_data_ready = true;
+            // re-init
+            mTransStats.dataSizeMean = 0;
+            mTransStats.dataSizeSum = 0;
+            mTransStats.droppedSamples = 0;
+            mTransStats.intervalNsec = 0;
+            mTransStats.latMax = 0;
+            mTransStats.latMean = 0;
+            mTransStats.latMin = 999999999999999;
+            mTransStats.latSampCount = 0;
+            mTransStats.latSampSum = 0;
         }
+        return myMode;
     }
 
 
 private:
-    // new
-    bool set_once;                          // used to set the size of vectors at the first call
-    std::vector<uint64_t> mLatencyMin;      // newly-added timestamps
-    std::vector<uint64_t> mLatencySum;      // newly-added timestamps
-    std::vector<uint64_t> mLatencyMax;      // newly-added timestamps
-    uint32_t mSampleSeqNumberPrevious;      // previous sample sequence number
-    uint64_t mDataSumInInterval;            // total bytes sent in period
-    uint32_t mSampleSumInInterval;          // number of samples in measurement period
-    uint32_t mSamplesDroppedInInterval;     // number of samples dropped in measurement period
-    uint64_t mIntervalStart;                // start time
+    // new new
+    struct transStats mTransStats;          // struct of transport latency stats data
     uint64_t mIntervalDuration;             // duration of the testing/reporting interval
-
+    uint64_t mIntervalEnd;                  // finish time of testing interval
 };

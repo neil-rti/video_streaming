@@ -56,7 +56,15 @@ namespace application {
         std::string this_station_name;
         uint32_t data_sample_size;
         std::string from_station_name;
-        bool is_vid_pub;
+        std::string loopInnerWhat;
+        int32_t loopInnerStart;
+        int32_t loopInnerStop;
+        int32_t loopInnerSteps;
+        int32_t loopInnerTimeMs;
+        std::string loopOuterWhat;
+        int32_t loopOuterStart;
+        int32_t loopOuterStop;
+        int32_t loopOuterSteps;
         rti::config::Verbosity verbosity;
 
         ApplicationArguments(
@@ -65,14 +73,31 @@ namespace application {
             std::string this_station_name_param,
             uint32_t data_sample_size_param,
             std::string from_station_name_param,
-            bool is_vid_pub_param,
+
+            std::string loopInnerWhat_param,
+            int32_t loopInnerStart_param,
+            int32_t loopInnerStop_param,
+            int32_t loopInnerSteps_param,
+            int32_t loopInnerTimeMs_param,
+            std::string loopOuterWhat_param,
+            int32_t loopOuterStart_param,
+            int32_t loopOuterStop_param,
+            int32_t loopOuterSteps_param,
             rti::config::Verbosity verbosity_param)
             : parse_result(parse_result_param),
             domain_id(domain_id_param),
             this_station_name(this_station_name_param),
             data_sample_size(data_sample_size_param),
             from_station_name(from_station_name_param),
-            is_vid_pub(is_vid_pub_param),
+            loopInnerWhat(loopInnerWhat_param),
+            loopInnerStart(loopInnerStart_param),
+            loopInnerStop(loopInnerStop_param),
+            loopInnerSteps(loopInnerSteps_param),
+            loopInnerTimeMs(loopInnerTimeMs_param),
+            loopOuterWhat(loopOuterWhat_param),
+            loopOuterStart(loopOuterStart_param),
+            loopOuterStop(loopOuterStop_param),
+            loopOuterSteps(loopOuterSteps_param),
             verbosity(verbosity_param) {}
     };
 
@@ -117,12 +142,11 @@ namespace application {
         std::string this_station_name = "My station default name";    // my station name 
         std::string from_station_name = "From station default name";  // Receive data from this station
         std::string config_filename = config_filename_default;
-        bool is_vid_pub = true;
         bool writeback_config_file = false;
         uint32_t data_sample_size = 1504;
         rti::config::Verbosity verbosity(rti::config::Verbosity::EXCEPTION);
 
-        // 2: parms from config file.  Was one specified as cmdline arg?
+        // 2&3: parms from config file or default value.  Was one specified as cmdline arg?
         while (arg_processing < argc) {
             if ((argc > arg_processing + 1)
             && (strcmp(argv[arg_processing], "-c") == 0
@@ -138,12 +162,23 @@ namespace application {
         // load properties from file
         PropertyUtil* prop = new PropertyUtil(config_filename);
         domain_id = prop->getIntProperty("config.domainId");
-        data_sample_size = prop->getIntProperty("config.data_sample_size");
-        if(data_sample_size == 0) data_sample_size = 1316;
-        this_station_name = prop->getStringProperty("config.this_station_name");
-        if(this_station_name == "") this_station_name = "ThisStationDefaultName";
-        from_station_name = prop->getStringProperty("config.from_station_name");
-        if(from_station_name == "") from_station_name = "FromStationDefaultName";
+        unsigned int tmp_data_sample_size = prop->getIntProperty("config.data_sample_size");
+        if(tmp_data_sample_size != 0) data_sample_size = tmp_data_sample_size;
+        std::string tmp_this_station_name = prop->getStringProperty("config.this_station_name");
+        if (tmp_this_station_name != "") this_station_name = tmp_this_station_name;
+        std::string tmp_from_station_name = prop->getStringProperty("config.from_station_name");
+        if(tmp_from_station_name != "") from_station_name = tmp_from_station_name;
+
+        // a few more parms for test automation; =0 if not set in config file
+        std::string loopInnerWhat = prop->getStringProperty("test.loop.inner.what");
+        int32_t loopInnerStart = prop->getIntProperty("test.loop.inner.start");
+        int32_t loopInnerStop = prop->getIntProperty("test.loop.inner.stop");
+        int32_t loopInnerSteps = prop->getIntProperty("test.loop.inner.steps");
+        int32_t loopInnerTimeMs = prop->getIntProperty("test.loop.inner.time_ms");
+        std::string loopOuterWhat = prop->getStringProperty("test.loop.outer.what");
+        int32_t loopOuterStart = prop->getIntProperty("test.loop.outer.start");
+        int32_t loopOuterStop = prop->getIntProperty("test.loop.outer.stop");
+        int32_t loopOuterSteps = prop->getIntProperty("test.loop.outer.steps");
 
         // 1: parse the command line args
         arg_processing = 1;
@@ -178,16 +213,6 @@ namespace application {
                 config_filename = std::string(argv[arg_processing + 1]);
                 arg_processing += 2;
             }
-            else if ((strcmp(argv[arg_processing], "-p") == 0
-                || strcmp(argv[arg_processing], "--pub") == 0)) {
-                is_vid_pub = true;
-                arg_processing += 1;
-            }
-            else if ((strcmp(argv[arg_processing], "-s") == 0
-                || strcmp(argv[arg_processing], "--sub") == 0)) {
-                is_vid_pub = false;
-                arg_processing += 1;
-            }
             else if ((strcmp(argv[arg_processing], "-w") == 0
                 || strcmp(argv[arg_processing], "--writeback") == 0)) {
                 writeback_config_file = true;
@@ -218,14 +243,10 @@ namespace application {
             std::cout << "Usage:\n"\
                 "    -d, --domain      <int>     Domain ID this application will operate in\n" \
                 "                                Default: " << domain_id << "\n"\
-                "    -p, --pub                   Publish (video stream)\n"\
-                "    -s, --sub                   Subscribe (video stream)\n"\
                 "    -m, --me          <string>  ID of this station\n" \
                 "                                Default: " << this_station_name << "\n"\
                 "    -f, --from        <string>  Receive data from this station\n" \
                 "                                Default: " << from_station_name << "\n"\
-                "    -s, --size        <int>     Size of the data portion to be streamed\n"\
-                "                                Default: " << data_sample_size << "\n"\
                 "    -c, --configfile  <string>  Configuration filename to load\n"\
                 "                                Default: " << config_filename_default << "\n"\
                 "    -w, --writeback             Write-back to the config file, updated args\n"\
@@ -244,6 +265,16 @@ namespace application {
             tmpMap["config.domainId"] = std::to_string(domain_id);
             tmpMap["config.from_station_name"] = this_station_name;
             tmpMap["config.this_station_name"] = from_station_name;
+            tmpMap.insert(std::pair<std::string, std::string>("test.loop.inner.what", loopInnerWhat));
+            tmpMap.insert(std::pair<std::string, std::string>("test.loop.inner.start", std::to_string(loopInnerStart)));
+            tmpMap.insert(std::pair<std::string, std::string>("test.loop.inner.stop", std::to_string(loopInnerStop)));
+            tmpMap.insert(std::pair<std::string, std::string>("test.loop.inner.steps", std::to_string(loopInnerSteps)));
+            tmpMap.insert(std::pair<std::string, std::string>("test.loop.inner.time_ms", std::to_string(loopInnerTimeMs)));
+            tmpMap.insert(std::pair<std::string, std::string>("test.loop.outer.what", loopOuterWhat));
+            tmpMap.insert(std::pair<std::string, std::string>("test.loop.outer.start", std::to_string(loopOuterStart)));
+            tmpMap.insert(std::pair<std::string, std::string>("test.loop.outer.stop", std::to_string(loopOuterStop)));
+            tmpMap.insert(std::pair<std::string, std::string>("test.loop.outer.steps", std::to_string(loopOuterSteps)));
+
             std::ofstream fout(config_filename);
             if(fout) {
                 for (auto kv : tmpMap) {
@@ -258,8 +289,8 @@ namespace application {
 
         return ApplicationArguments(
             parse_result, domain_id, this_station_name, data_sample_size, from_station_name, 
-            is_vid_pub, verbosity);
- 
+            loopInnerWhat, loopInnerStart, loopInnerStop, loopInnerSteps, loopInnerTimeMs, 
+            loopOuterWhat, loopOuterStart, loopOuterStop, loopOuterSteps, verbosity);
     }
 
     /** ----------------------------------------------------------------
