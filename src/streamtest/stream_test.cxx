@@ -25,6 +25,13 @@
 #include "com_perf.hpp"             // for latency measurement
 #include "streamtest/app_helper.hpp"    // for command line args and signals
 
+enum class loopCfg {
+    LOOP_NONE,
+    LOOP_PUBSIZE,
+    LOOP_PUBRATE,
+    LOOP_DATARATE
+};
+
 // a few globals for expediency
 comPerfCalc gMyPerfCalc;            // class for accumulating latency test results
 rtiComms* gMyPerfPub = NULL;        // pointer to DDS publisher instance
@@ -107,34 +114,33 @@ void participant_main(application::ApplicationArguments args)
     // create ccBulk publisher and subscriber; these will be on different-named topics
     dds::core::cond::WaitSet waitset;
     rtiComms perfPub(std::string("t" + gMyNodeId), CTRL_PUB_BE, participant);
-    gMyPerfPub = &perfPub;
     rtiComms perfSub(std::string("t" + fromId), CTRL_SUB_BE, participant, &waitset, &perfDataRcv_callback);
+
+    // init a pub sample
+    cctypes::ccBulk pubSample;
+    pubSample.pub_id(gMyNodeId);
+    gMyPerfPub = &perfPub;
 
     // were any sweep parms set in the config file?
     uint8_t testMode = 0;
-    enum loopCfgEnum {
-        LOOP_NONE = 0,
-        LOOP_PUBSIZE,
-        LOOP_PUBRATE,
-        LOOP_DATARATE
-    };
-    loopCfgEnum innerCfg, outerCfg;
+    loopCfg innerCfg, outerCfg;
     if (args.loopInnerSteps) {
         testMode = 1;
-        if (args.loopInnerWhat == "pubsize") innerCfg = LOOP_PUBSIZE;
-        else if (args.loopInnerWhat == "pubrate") innerCfg = LOOP_PUBRATE;
-        else if (args.loopInnerWhat == "datarate") innerCfg = LOOP_DATARATE;
-        else innerCfg = LOOP_NONE;
-        if (args.loopOuterWhat == "pubsize") outerCfg = LOOP_PUBSIZE;
-        else if (args.loopOuterWhat == "pubrate") outerCfg = LOOP_PUBRATE;
-        else if (args.loopOuterWhat == "datarate") outerCfg = LOOP_DATARATE;
-        else outerCfg = LOOP_NONE;
+        if (args.loopInnerWhat == "pubsize") innerCfg = loopCfg::LOOP_PUBSIZE;
+        else if (args.loopInnerWhat == "pubrate") innerCfg = loopCfg::LOOP_PUBRATE;
+        else if (args.loopInnerWhat == "datarate") innerCfg = loopCfg::LOOP_DATARATE;
+        else innerCfg = loopCfg::LOOP_NONE;
+        if (args.loopOuterWhat == "pubsize") outerCfg = loopCfg::LOOP_PUBSIZE;
+        else if (args.loopOuterWhat == "pubrate") outerCfg = loopCfg::LOOP_PUBRATE;
+        else if (args.loopOuterWhat == "datarate") outerCfg = loopCfg::LOOP_DATARATE;
+        else outerCfg = loopCfg::LOOP_NONE;
     }
 
-    //cctypes::commandMode testMode = cctypes::commandMode::PING_2SEC;
-    uint64_t pingRateNs = 2000000000;        // 2-second ping rate
-    uint64_t tNextPingPub = tstamp_u64_get() + pingRateNs;
+    uint64_t timeBetweenPubsNs = 2000000000;        // 2-second ping rate
+    uint64_t tNextPingPub = tstamp_u64_get() + timeBetweenPubsNs;
+    uint64_t tNextInnerUpdate;
     uint32_t seqNum = 0;
+    uint32_t pubCount = 0;
 
     // test loop
     while (false == application::shutdown_requested) {
@@ -147,9 +153,7 @@ void participant_main(application::ApplicationArguments args)
             // publish a ping every pingInterval
             if (tLoop >= tNextPingPub) {
                 // publish a ping packet
-                cctypes::ccBulk pubSample;
-                // my ID, sequence number, index, and timestamps of previous link in loop
-                pubSample.pub_id(gMyNodeId);
+                // sequence number, index, and timestamps of previous link in loop
                 memcpy(pubSample.data().data(), &seqNum, sizeof(uint32_t));
                 uint32_t tmpIdx = 8 + (2 * sizeof(uint64_t));
                 memcpy(pubSample.data().data() + sizeof(uint32_t), &tmpIdx, sizeof(uint32_t));
@@ -157,19 +161,19 @@ void participant_main(application::ApplicationArguments args)
                 memcpy(pubSample.data().data() + 8 + sizeof(uint64_t), &gTSPrevLink[1], sizeof(uint64_t));
                 perfPub.publish(pubSample);
 
-                // set the next interval for now + pingRateNs                
-                tNextPingPub = tLoop + pingRateNs;
-                // If needed, nudge the next ping time to be closer to (pingRateNs/2) from received ping
+                // set the next interval for now + timeBetweenPubsNs                
+                tNextPingPub = tLoop + timeBetweenPubsNs;
+                // If needed, nudge the next ping time to be closer to (timeBetweenPubsNs/2) from received ping
                 uint64_t tDiff = tLoop - gTSubRcv;
                 // if we are receiving ping from another test app
-                if (tDiff < (pingRateNs * 2)) {
-                    if (tDiff > ((pingRateNs * 110) / 200)) {
+                if (tDiff < (timeBetweenPubsNs * 2)) {
+                    if (tDiff > ((timeBetweenPubsNs * 110) / 200)) {
                         // if they're more than 10% over the halfway point, nudge our next time downward
-                        tNextPingPub -= (pingRateNs / 32);
+                        tNextPingPub -= (timeBetweenPubsNs / 32);
                     }
-                    else if (tDiff < ((pingRateNs * 90) / 200)) {
+                    else if (tDiff < ((timeBetweenPubsNs * 90) / 200)) {
                         // if more than 10% under the halfway point, nudge upward
-                        tNextPingPub += (pingRateNs / 32);
+                        tNextPingPub += (timeBetweenPubsNs / 32);
                     }
                 }
                 seqNum++;
@@ -179,28 +183,27 @@ void participant_main(application::ApplicationArguments args)
             // run a sweep test of some sort; stay here until complete or timeout
             bool inloop = true;
             bool updateOuter = true;
+            bool updateInner = true;
             int32_t outNow = args.loopOuterStart;
             int32_t outStep = 0;
             int32_t inNow = args.loopInnerStart;
             int32_t inStep = 0;
-            uint64_t timeBetweenPubsNs;
-            uint32_t loopDataRate;
+            uint64_t timeToPublish = tstamp_u64_get();
             while (inloop || false == application::shutdown_requested) {
                 tLoop = tstamp_u64_get();
 
                 // outer loop
                 if ((outStep <= args.loopOuterSteps) && (updateOuter)) {
                     // set what needs setting
-                    if (outerCfg == LOOP_PUBSIZE) {
+                    if (outerCfg == loopCfg::LOOP_PUBSIZE) {
                         perfPub.pub_sample_data_size_set(outNow);
                     }
-                    else if (outerCfg == LOOP_PUBRATE) {
+                    else if (outerCfg == loopCfg::LOOP_PUBRATE) {
                         // pub rate is in samples per second
-                        timeBetweenPubsNs = 1000000000 / outNow;
+                        timeBetweenPubsNs = (uint64_t)1000000000 / outNow;
                     }
-                    else if (outerCfg == LOOP_DATARATE) {
+                    else if (outerCfg == loopCfg::LOOP_DATARATE) {
                         // datarate is in bytes per second
-                        loopDataRate = outNow;
                     }
 
                     outStep++;
@@ -211,44 +214,82 @@ void participant_main(application::ApplicationArguments args)
                     updateOuter = false;
                 }
 
-                // inner loop
-                if (innerCfg == LOOP_PUBSIZE) {
-                    perfPub.pub_sample_data_size_set(inNow);
-                }
-                else if (innerCfg == LOOP_PUBRATE) {
-                    // pub rate is in samples per second
-                    timeBetweenPubsNs = 1000000000 / inNow;
-                }
-                else if (innerCfg == LOOP_DATARATE) {
-                    // datarate is in bytes per second
-                    // adjust the value that's not in the outer loop
-                    if (outerCfg == LOOP_PUBRATE) {
-                        // adjust the pubsize at this pubrate to meet this datarate
+                // inner loop is the stepped var, outer loop is fixed
+                if (updateInner) {
+                    if (innerCfg == loopCfg::LOOP_PUBSIZE) {
+                        if (outerCfg == loopCfg::LOOP_DATARATE) {
+                            // to keep a constant dataRate, adjust the pubRate
+                            timeBetweenPubsNs = ((uint64_t)1000000000 * inNow) / outNow;
+                        }
+                        fprintf(stdout, "iPubSize: %d, pubRate: %lld, dataRate: %d (%d)\n", inNow, ((uint64_t)1000000000 / timeBetweenPubsNs), outNow, (inNow * (uint64_t)1000000000) / timeBetweenPubsNs);
+                        perfPub.pub_sample_data_size_set(inNow);
                     }
-                    else if (outerCfg == LOOP_PUBSIZE) {
-                        // adjust the pubrate at this pubsize to meet this datarate
+                    else if (innerCfg == loopCfg::LOOP_PUBRATE) {
+                        // pub rate is in samples per second
+                        timeBetweenPubsNs = (uint64_t)1000000000 / inNow;
+                        if (outerCfg == loopCfg::LOOP_DATARATE) {
+                            // to keep a constant datarate, adjust the pubSize
+                            int32_t tmpSize = outNow / inNow;
+                            if (tmpSize > pubSample.data().max_size()) tmpSize = pubSample.data().max_size();
+                            perfPub.pub_sample_data_size_set(tmpSize);
+                            fprintf(stdout, "iPubRate: %d, pubSize: %d, dataRate: %d (%d) count: %u\n", inNow, tmpSize, (inNow * tmpSize), outNow, pubCount);
+                        }
                     }
-                    loopDataRate = inNow;   // not needed?
-                }
+                    else if (innerCfg == loopCfg::LOOP_DATARATE) {
+                        if (outerCfg == loopCfg::LOOP_PUBRATE) {
+                            // adjust the pubsize at this pubrate to meet this datarate
+                            int32_t tmpSize = inNow / outNow;
+                            if (tmpSize > pubSample.data().max_size()) tmpSize = pubSample.data().max_size();
+                            perfPub.pub_sample_data_size_set(tmpSize);
+                            fprintf(stdout, "iDataRate: %d (%d), pubSize: %d, pubRate: %d\n", inNow, (outNow * tmpSize), tmpSize, outNow);
+                        }
+                        else if (outerCfg == loopCfg::LOOP_PUBSIZE) {
+                            // adjust the pubrate to fit this pubsize and datarate
+                            timeBetweenPubsNs = ((uint64_t)1000000000 * outNow) / inNow;
+                            fprintf(stdout, "iDataRate: %d, pubSize: %d, pubRate: %lld\n", inNow, outNow, ((uint64_t)1000000000 / timeBetweenPubsNs));
 
-                inStep++;
-                if (inStep >= args.loopInnerSteps) {
-                    if (outStep > args.loopOuterSteps) {
-                        // finished with test
-                        inloop = false;
+                        }
+                    }
+
+                    inStep++;
+                    if (inStep >= args.loopInnerSteps) {
+                        if (outStep > args.loopOuterSteps) {
+                            // finished with test
+                            inloop = false;
+                        }
+                        else {
+                            // loop again
+                            inNow = args.loopInnerStart;
+                            inStep = 0;
+                            updateOuter = true;
+                        }
                     }
                     else {
-                        // loop again
-                        inNow = args.loopInnerStart;
-                        inStep = 0;
-                        updateOuter = true;
+                        // update the controlled value to the next step
+                        inNow = ((((10 * inStep * (args.loopInnerStop - args.loopInnerStart)) / args.loopInnerSteps) + 5) / 10) + args.loopInnerStart;
                     }
+                    tNextInnerUpdate = tLoop + ((uint64_t)args.loopInnerTimeMs * 1000000);
+                    pubCount = 0;
+                    updateInner = false;
                 }
-                else {
-                    // update the controlled value
-                    // FIXME: scale this up to get better integer math rounding
-                    // inNow = ((inStep * (args.loopInnerStop - args.loopInnerStart)) / args.loopInnerSteps) + args.loopInnerStart;
-                    inNow = ((((10 * inStep * (args.loopInnerStop - args.loopInnerStart)) / args.loopInnerSteps) + 5) / 10) + args.loopInnerStart;
+                // now: time to publish?
+                if (tLoop >= timeToPublish) {
+                    // prepare and publish another sample
+                    // fprintf(stdout, "Publish at %llu, interval: %llu\n", tLoop, timeBetweenPubsNs);
+                    pubCount++;
+                    timeToPublish = tLoop + timeBetweenPubsNs;
+
+                }
+
+                // time to update inner loop?
+                updateInner = (tLoop > tNextInnerUpdate);
+
+                // check for sample received.
+                //waitset.dispatch(dds::core::Duration(0, 10000));
+
+                // check for data available
+                if (gMyPerfCalc.perf_data_ready) {
+                    gMyPerfCalc.print_perf_data();
                 }
             }
         }

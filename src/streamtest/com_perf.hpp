@@ -58,7 +58,6 @@ public:
         mIntervalEnd = tstamp_u64_get() + mIntervalDuration;
     }
 
-
     // update the stats with a new set of timestamps
     uint8_t update_stats(uint64_t tLast, const uint8_t *newStamps, uint32_t dataSize)
     {
@@ -115,6 +114,22 @@ public:
         return myMode;
     }
 
+    // printPerfData() -- print stuff
+    void print_perf_data(void)
+    {
+        while (transportStats.size()) {
+            fprintf(stdout, "%lld,%lld,%lld,%lld,%lld,%d,%lld\n",
+                transportStats.front().dataSizeMean,
+                transportStats.front().latMin,
+                transportStats.front().latMean,
+                transportStats.front().latMax,
+                transportStats.front().latSampCount,
+                transportStats.front().droppedSamples,
+                transportStats.front().intervalNsec);
+            transportStats.erase(transportStats.begin());
+        }
+        perf_data_ready = false;
+    }
 
 private:
     // new new
