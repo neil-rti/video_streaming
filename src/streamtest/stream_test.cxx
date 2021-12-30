@@ -40,60 +40,89 @@ uint64_t gTSubRcv = 0;              // timestamp of most-recent subscriber sampl
 uint64_t gTSPrevLink[2] = { 0 };    // timestamps (pub, sub) of the previous transport in test loop
 bool gForwardOnly = false;          // if true, don't initiate any pub action (other than forwarding rcv'd samples)
 
+// listener class for received test data
+class TestDataReaderListener
+    : public dds::sub::NoOpDataReaderListener<cctypes::ccBulk> {
+    virtual void on_requested_deadline_missed(
+        dds::sub::DataReader<cctypes::ccBulk>& reader,
+        const dds::core::status::RequestedDeadlineMissedStatus& status)
+    {
+        std::cout << "ReaderListener: on_requested_deadline_missed()"
+            << std::endl;
+    }
 
-/** ----------------------------------------------------------------
- * perfDataRcv_callback()
- * Callback for received performance samples from the far end
- * If sample pub_id != myId, then add my timestamps, re-publish the data,
- *     and calc/show transport latency
- * else sample pub_id == myId: copy the last 2 timestamps to the first 2
- *     in a new sample to pub, reset idx, and calc/show transport latency.
- **/
-int perfDataRcv_callback(dds::sub::DataReader<cctypes::ccBulk > reader)
-{
-    int count = 0;
-    dds::sub::LoanedSamples<cctypes::ccBulk> samples = reader.take();
-    for (const auto& sample : samples) {
-        if (sample.info().valid()) {
+    virtual void on_requested_incompatible_qos(
+        dds::sub::DataReader<cctypes::ccBulk>& reader,
+        const dds::core::status::RequestedIncompatibleQosStatus& status)
+    {
+        std::cout << "ReaderListener: on_requested_incompatible_qos()"
+            << std::endl;
+    }
 
-            // get high-res timestamp
-            uint64_t tNow = tstamp_u64_get();
-            gTSubRcv = tNow;
+    virtual void on_sample_rejected(
+        dds::sub::DataReader<cctypes::ccBulk>& reader,
+        const dds::core::status::SampleRejectedStatus& status)
+    {
+        std::cout << "ReaderListener: on_sample_rejected()" << std::endl;
+    }
 
-            // update the stats for this interval
-            uint8_t myMode = gMyPerfCalc.update_stats(tNow, sample.data().data().data(), sample.data().data().size());
-            gForwardOnly = (myMode != 0);
+    virtual void on_liveliness_changed(
+        dds::sub::DataReader<cctypes::ccBulk>& reader,
+        const dds::core::status::LivelinessChangedStatus& status)
+    {
+        std::cout << "ReaderListener: on_liveliness_changed()" << std::endl
+            << "  Alive writers: " << status.alive_count() << std::endl;
+    }
 
-            // now either forward or retire the sample
-            uint32_t idxAndMode = *(uint32_t*)(sample.data().data().data() + 4);
-            uint32_t nextIdx = idxAndMode & 0xfff;
-            if (sample.data().pub_id() == gMyNodeId) {
-                // this sample did not come from me; re-publish it with my timestamps added, update the idx
-                cctypes::ccBulk tmpSample = sample;
-                idxAndMode = (idxAndMode & 0xf000) | (nextIdx + (2 * sizeof(uint64_t)));
-                memcpy(tmpSample.data().data() + 4, &idxAndMode, sizeof(uint32_t));
-                memcpy(tmpSample.data().data() + nextIdx, &tNow, sizeof(uint64_t));
+    virtual void on_sample_lost(
+        dds::sub::DataReader<cctypes::ccBulk>& reader,
+        const dds::core::status::SampleLostStatus& status)
+    {
+        std::cout << "ReaderListener: on_sample_lost()" << std::endl;
+    }
 
-                // a new timestamp right before publishing
-                tNow = tstamp_u64_get();
-                memcpy(tmpSample.data().data() + nextIdx + sizeof(uint64_t), &tNow, sizeof(uint64_t));
-                gMyPerfPub->publish(tmpSample);
-            }
-            else {
-                // this sample came from me; retire it
-                // copy only the last 2 timestamps to be available for the start of my own next pub sample
-                nextIdx -= sizeof(uint64_t);
-                if (nextIdx >= 8) {
-                    gTSPrevLink[0] = *(uint64_t*)(sample.data().data().data() + nextIdx);
+    virtual void on_subscription_matched(
+        dds::sub::DataReader<cctypes::ccBulk>& reader,
+        const dds::core::status::SubscriptionMatchedStatus& status)
+    {
+        std::cout << "ReaderListener: on_subscription_matched()" << std::endl;
+    }
+
+    virtual void on_data_available(dds::sub::DataReader<cctypes::ccBulk>& reader)
+    {
+        dds::sub::LoanedSamples<cctypes::ccBulk> samples = reader.take();
+        for (const auto& sample : samples) {
+            if (sample.info().valid()) {
+                // get high-res timestamp
+                uint64_t tNow = tstamp_u64_get();
+                gTSubRcv = tNow;
+
+                // update the stats for this interval
+                uint8_t myMode = gMyPerfCalc.update_stats(tNow, sample.data().data().data(), (uint32_t)sample.data().data().size());
+                gForwardOnly = (myMode != 0);
+
+                // now either forward or retire the sample
+                if (sample.data().pub_id() != gMyNodeId) {
+                    // this sample did not come from me; re-publish it with my timestamps moved to 'prev' positions
+                    cctypes::ccBulk tmpSample = sample;
+                    memcpy(tmpSample.data().data() + 16, tmpSample.data().data() + 32, sizeof(uint64_t));
+                    memcpy(tmpSample.data().data() + 24, &tNow, sizeof(uint64_t));
+
+                    // a new timestamp right before publishing
+                    tNow = tstamp_u64_get();
+                    memcpy(tmpSample.data().data() + 32, &tNow, sizeof(uint64_t));
+                    gMyPerfPub->publish(tmpSample);
+                }
+                else {
+                    // this sample came from me; retire it
+                    // copy only the last 2 timestamps to be available for the start of my own next pub sample
+                    gTSPrevLink[0] = *(uint64_t*)(sample.data().data().data() + 32);
                     gTSPrevLink[1] = tNow;
                 }
             }
-            count++;
         }
     }
-    return count;
-}
-
+};
 
 /** ----------------------------------------------------------------
  * participant_main()
@@ -111,15 +140,19 @@ void participant_main(application::ApplicationArguments args)
     // Create a DomainParticipant with default Qos
     dds::domain::DomainParticipant participant(args.domain_id);
 
-    // create ccBulk publisher and subscriber; these will be on different-named topics
-    dds::core::cond::WaitSet waitset;
-    rtiComms perfPub(std::string("t" + gMyNodeId), CTRL_PUB_BE, participant);
-    rtiComms perfSub(std::string("t" + fromId), CTRL_SUB_BE, participant, &waitset, &perfDataRcv_callback);
+    // use a dataReader with a listener to receive test data
+    dds::topic::Topic<cctypes::ccBulk> rcvTopic(participant, std::string("t" + fromId));
+    dds::sub::Subscriber rcvSub(participant);
+    dds::sub::DataReader<cctypes::ccBulk> rcvReader(rcvSub, rcvTopic);
+    auto rr_listener = std::make_shared<TestDataReaderListener>();
+    rcvReader.set_listener(rr_listener);
 
-    // init a pub sample
-    cctypes::ccBulk pubSample;
-    pubSample.pub_id(gMyNodeId);
+    // create ccBulk publisher and init a sample
+    rtiComms perfPub(std::string("t" + gMyNodeId), CTRL_PUB_BE, participant);
     gMyPerfPub = &perfPub;
+    cctypes::ccBulk pubSample;
+    pubSample.data().resize(args.data_sample_size);
+    pubSample.pub_id(gMyNodeId);
 
     // were any sweep parms set in the config file?
     uint8_t testMode = 0;
@@ -153,15 +186,17 @@ void participant_main(application::ApplicationArguments args)
             // publish a ping every pingInterval
             if (tLoop >= tNextPingPub) {
                 // publish a ping packet
-                // sequence number, index, and timestamps of previous link in loop
-                memcpy(pubSample.data().data(), &seqNum, sizeof(uint32_t));
-                uint32_t tmpIdx = 8 + (2 * sizeof(uint64_t));
-                memcpy(pubSample.data().data() + sizeof(uint32_t), &tmpIdx, sizeof(uint32_t));
-                memcpy(pubSample.data().data() + 8, &gTSPrevLink[0], sizeof(uint64_t));
-                memcpy(pubSample.data().data() + 8 + sizeof(uint64_t), &gTSPrevLink[1], sizeof(uint64_t));
+                comPerfCalc::testPacking* testParts = (comPerfCalc::testPacking*)pubSample.data().data();
+                testParts->seqNum = seqNum;
+                testParts->pub_rate = 2000000000;
+                testParts->pub_size = (uint32_t)pubSample.data().size();
+                testParts->testMode = 1;
+                testParts->tStampPubPrev = gTSPrevLink[0];
+                testParts->tStampSubPrev = gTSPrevLink[1];
+                testParts->tStampPubNow = tstamp_u64_get();
                 perfPub.publish(pubSample);
 
-                // set the next interval for now + timeBetweenPubsNs                
+                // set the next interval for now + timeBetweenPubsNs
                 tNextPingPub = tLoop + timeBetweenPubsNs;
                 // If needed, nudge the next ping time to be closer to (timeBetweenPubsNs/2) from received ping
                 uint64_t tDiff = tLoop - gTSubRcv;
@@ -188,6 +223,7 @@ void participant_main(application::ApplicationArguments args)
             int32_t outStep = 0;
             int32_t inNow = args.loopInnerStart;
             int32_t inStep = 0;
+            gMyPerfCalc.print_perf_header();
             uint64_t timeToPublish = tstamp_u64_get();
             while (inloop || false == application::shutdown_requested) {
                 tLoop = tstamp_u64_get();
@@ -196,7 +232,7 @@ void participant_main(application::ApplicationArguments args)
                 if ((outStep <= args.loopOuterSteps) && (updateOuter)) {
                     // set what needs setting
                     if (outerCfg == loopCfg::LOOP_PUBSIZE) {
-                        perfPub.pub_sample_data_size_set(outNow);
+                        pubSample.data().resize(outNow);
                     }
                     else if (outerCfg == loopCfg::LOOP_PUBRATE) {
                         // pub rate is in samples per second
@@ -221,8 +257,8 @@ void participant_main(application::ApplicationArguments args)
                             // to keep a constant dataRate, adjust the pubRate
                             timeBetweenPubsNs = ((uint64_t)1000000000 * inNow) / outNow;
                         }
-                        fprintf(stdout, "iPubSize: %d, pubRate: %lld, dataRate: %d (%d)\n", inNow, ((uint64_t)1000000000 / timeBetweenPubsNs), outNow, (inNow * (uint64_t)1000000000) / timeBetweenPubsNs);
-                        perfPub.pub_sample_data_size_set(inNow);
+                        //                        fprintf(stderr, "iPubSize: %d, pubRate: %lld, dataRate: %d (%d)\n", inNow, ((uint64_t)1000000000 / timeBetweenPubsNs), outNow, (inNow * (uint64_t)1000000000) / timeBetweenPubsNs);
+                        pubSample.data().resize(inNow);
                     }
                     else if (innerCfg == loopCfg::LOOP_PUBRATE) {
                         // pub rate is in samples per second
@@ -231,8 +267,8 @@ void participant_main(application::ApplicationArguments args)
                             // to keep a constant datarate, adjust the pubSize
                             int32_t tmpSize = outNow / inNow;
                             if (tmpSize > pubSample.data().max_size()) tmpSize = pubSample.data().max_size();
-                            perfPub.pub_sample_data_size_set(tmpSize);
-                            fprintf(stdout, "iPubRate: %d, pubSize: %d, dataRate: %d (%d) count: %u\n", inNow, tmpSize, (inNow * tmpSize), outNow, pubCount);
+                            pubSample.data().resize(tmpSize);
+                            //                            fprintf(stderr, "iPubRate: %d, pubSize: %d, dataRate: %d (%d) count: %u\n", inNow, tmpSize, (inNow * tmpSize), outNow, pubCount);
                         }
                     }
                     else if (innerCfg == loopCfg::LOOP_DATARATE) {
@@ -240,13 +276,13 @@ void participant_main(application::ApplicationArguments args)
                             // adjust the pubsize at this pubrate to meet this datarate
                             int32_t tmpSize = inNow / outNow;
                             if (tmpSize > pubSample.data().max_size()) tmpSize = pubSample.data().max_size();
-                            perfPub.pub_sample_data_size_set(tmpSize);
-                            fprintf(stdout, "iDataRate: %d (%d), pubSize: %d, pubRate: %d\n", inNow, (outNow * tmpSize), tmpSize, outNow);
+                            pubSample.data().resize(tmpSize);
+                            //                            fprintf(stderr, "iDataRate: %d (%d), pubSize: %d, pubRate: %d\n", inNow, (outNow * tmpSize), tmpSize, outNow);
                         }
                         else if (outerCfg == loopCfg::LOOP_PUBSIZE) {
                             // adjust the pubrate to fit this pubsize and datarate
                             timeBetweenPubsNs = ((uint64_t)1000000000 * outNow) / inNow;
-                            fprintf(stdout, "iDataRate: %d, pubSize: %d, pubRate: %lld\n", inNow, outNow, ((uint64_t)1000000000 / timeBetweenPubsNs));
+                            //                            fprintf(stderr, "iDataRate: %d, pubSize: %d, pubRate: %lld\n", inNow, outNow, ((uint64_t)1000000000 / timeBetweenPubsNs));
 
                         }
                     }
@@ -268,6 +304,9 @@ void participant_main(application::ApplicationArguments args)
                         // update the controlled value to the next step
                         inNow = ((((10 * inStep * (args.loopInnerStop - args.loopInnerStart)) / args.loopInnerSteps) + 5) / 10) + args.loopInnerStart;
                     }
+
+                    // gMyPerfCalc.interval_start_nsec(timeBetweenPubsNs);
+                    gMyPerfCalc.interval_start_nsec((uint64_t)args.loopInnerTimeMs * 1000000);
                     tNextInnerUpdate = tLoop + ((uint64_t)args.loopInnerTimeMs * 1000000);
                     pubCount = 0;
                     updateInner = false;
@@ -275,26 +314,29 @@ void participant_main(application::ApplicationArguments args)
                 // now: time to publish?
                 if (tLoop >= timeToPublish) {
                     // prepare and publish another sample
-                    // fprintf(stdout, "Publish at %llu, interval: %llu\n", tLoop, timeBetweenPubsNs);
-                    pubCount++;
+                    comPerfCalc::testPacking* testParts = (comPerfCalc::testPacking*)pubSample.data().data();
+                    testParts->seqNum = seqNum;
+                    testParts->pub_rate = timeBetweenPubsNs;
+                    testParts->pub_size = (uint32_t)pubSample.data().size();
+                    testParts->testMode = 2;
+                    testParts->tStampPubPrev = gTSPrevLink[0];
+                    testParts->tStampSubPrev = gTSPrevLink[1];
+                    testParts->tStampPubNow = tstamp_u64_get();
+                    perfPub.publish(pubSample);
                     timeToPublish = tLoop + timeBetweenPubsNs;
-
+                    pubCount++;
+                    seqNum++;
                 }
 
-                // time to update inner loop?
-                updateInner = (tLoop > tNextInnerUpdate);
-
-                // check for sample received.
-                //waitset.dispatch(dds::core::Duration(0, 10000));
-
-                // check for data available
+                // take the next step in inner loop only if we're getting data returned
                 if (gMyPerfCalc.perf_data_ready) {
                     gMyPerfCalc.print_perf_data();
+                    updateInner = true;
                 }
             }
         }
 
-        waitset.dispatch(dds::core::Duration(0, 100000));
+        // waitset.dispatch(dds::core::Duration(0, 100000));
         // rti::util::sleep(dds::core::Duration(0, 10000000));     // sleep 10mS, probably too long
     }
 }
@@ -303,7 +345,7 @@ void participant_main(application::ApplicationArguments args)
  * main()
  * arguments are handled in 'app_helper.hpp'
  **/
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     using namespace application;
 
@@ -311,14 +353,15 @@ int main(int argc, char *argv[])
     auto arguments = parse_arguments(argc, argv);
     if (arguments.parse_result == ParseReturn::exit) {
         return EXIT_SUCCESS;
-    } else if (arguments.parse_result == ParseReturn::failure) {
+    }
+    else if (arguments.parse_result == ParseReturn::failure) {
         return EXIT_FAILURE;
     }
     setup_signal_handlers();
 
     // Sets Connext verbosity to help debugging
     rti::config::Logger::instance().verbosity(arguments.verbosity);
-  
+
     try {
         participant_main(arguments);
     }

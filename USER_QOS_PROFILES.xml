@@ -99,6 +99,11 @@ XML" chapter in the RTI Connext DDS Core Libraries User's Manual.
 
                 <!--
                 <transport_builtin>
+                    <mask>UDPv4</mask>
+                </transport_builtin>
+                -->
+                <!-- 
+                <transport_builtin>
                     <mask>UDPv4_WAN</mask>
                 </transport_builtin>
                 <discovery>

@@ -28,6 +28,17 @@ public:
         mTransStats.latSampSum = 0;
     }
 
+    // struct for the data packing into the video sample .data() payload
+    struct testPacking {
+        uint32_t    seqNum;
+        uint32_t    testMode;
+        uint32_t    pub_rate;
+        uint32_t    pub_size;
+        uint64_t    tStampPubPrev;
+        uint64_t    tStampSubPrev;
+        uint64_t    tStampPubNow;
+    };
+
     struct transStats {
         int64_t     latMin;
         int64_t     latMean;
@@ -45,44 +56,34 @@ public:
 
 
     // start test interval w/duration
-    void interval_start_nsec(uint64_t nsec) { 
-        mIntervalDuration = nsec; 
-        mIntervalEnd = tstamp_u64_get() + mIntervalDuration;
-  }
-    void interval_start_usec(uint64_t usec) { 
-        mIntervalDuration = usec * 1000; 
+    void interval_start_nsec(uint64_t nsec) {
+        mIntervalDuration = nsec;
         mIntervalEnd = tstamp_u64_get() + mIntervalDuration;
     }
-    void interval_start_msec(uint64_t msec) { 
-        mIntervalDuration = msec * 1000000; 
+    void interval_start_usec(uint64_t usec) {
+        mIntervalDuration = usec * 1000;
+        mIntervalEnd = tstamp_u64_get() + mIntervalDuration;
+    }
+    void interval_start_msec(uint64_t msec) {
+        mIntervalDuration = msec * 1000000;
         mIntervalEnd = tstamp_u64_get() + mIntervalDuration;
     }
 
     // update the stats with a new set of timestamps
-    uint8_t update_stats(uint64_t tLast, const uint8_t *newStamps, uint32_t dataSize)
+    uint8_t update_stats(uint64_t tLast, const uint8_t* newStamps, uint32_t dataSize)
     {
-        // bytes[7:0] have meta info
-        uint32_t seqNum = *(uint32_t*)(newStamps + 0);  // sequence number [3:0]
-        uint32_t tmpVal = *(uint32_t*)(newStamps + 4);
-        uint32_t nextIdx = tmpVal & 0xfff;              // next open index [6:4]
-        uint8_t  myMode = tmpVal >> 24;                 // operating mode  [7]
-
-        // for each link timestamp pair, get (latency+clockOffset) from pub-sub
-        // most-recent link is timed from tLast - (last timestamp in newStamps)
-        int64_t latencyAndClockOffsetSum = tLast - (*(uint64_t*)(newStamps + nextIdx - sizeof(uint64_t)));
-        int32_t linkCount = 1;
-        // now get the remaining link times
-        uint32_t tmpIdx = nextIdx - (3 * sizeof(uint64_t));
-        while (tmpIdx >= (8 + (2 * sizeof(uint64_t)))) {
-            // add the (latency + clock offset) of this link to the running sum
-            latencyAndClockOffsetSum += (*(uint64_t*)(newStamps + tmpIdx)) - (*(uint64_t*)(newStamps + tmpIdx + sizeof(uint64_t)));
-            linkCount++;
-            tmpIdx -= (2 * sizeof(uint64_t));
-        }
-
-        // in a 2-tester loop, the clock offsets will cancel each other out,
-        // leaving us with just the transport latency (x2)
-        int64_t transportLatencyAverage = latencyAndClockOffsetSum / linkCount;
+        // Get the average transport latency, and check for any dropped samples
+        testPacking* testParts = (testPacking*)newStamps;
+        int64_t latPlusClockOfsPrev = testParts->tStampSubPrev - testParts->tStampPubPrev;
+        int64_t latPlusClockOfsNow = tLast - testParts->tStampPubNow;
+        int64_t transportLatencyAverage = (latPlusClockOfsPrev + latPlusClockOfsNow) / 2;
+        fprintf(stderr, "seq,%u,rate,%u,size,%u,B-A,%lld,D-C,%lld,Avg,%lld\n",
+            testParts->seqNum,
+            testParts->pub_rate,
+            testParts->pub_size,
+            latPlusClockOfsPrev,
+            latPlusClockOfsNow,
+            transportLatencyAverage);
 
         // put into sum/min/max values and update the count
         mTransStats.latSampSum += transportLatencyAverage;
@@ -111,10 +112,14 @@ public:
             mTransStats.latSampCount = 0;
             mTransStats.latSampSum = 0;
         }
-        return myMode;
+        return (uint8_t)testParts->testMode;
     }
 
-    // printPerfData() -- print stuff
+    // print_perf_data() -- print stuff
+    void print_perf_header(void) {
+        fprintf(stdout, "dataSize,latMin,latMean,latMax,count,dropped,interval_nsec\n");
+    }
+
     void print_perf_data(void)
     {
         while (transportStats.size()) {
