@@ -17,6 +17,7 @@ public:
         perf_data_ready = false;
         mIntervalEnd = 0;
         mIntervalDuration = 500000000;
+        mPrevSeqNum = 0;
         mTransStats.dataSizeMean = 0;
         mTransStats.dataSizeSum = 0;
         mTransStats.droppedSamples = 0;
@@ -26,6 +27,7 @@ public:
         mTransStats.latMin = 999999999999999;
         mTransStats.latSampCount = 0;
         mTransStats.latSampSum = 0;
+        mTransStats.pubIntervalSumNsec = 0;
     }
 
     // struct for the data packing into the video sample .data() payload
@@ -49,6 +51,7 @@ public:
         int64_t     dataSizeSum;
         int32_t     droppedSamples;
         uint64_t    intervalNsec;
+        uint64_t    pubIntervalSumNsec;
     };
     // Outputs
     std::vector<transStats> transportStats;
@@ -77,6 +80,7 @@ public:
         int64_t latPlusClockOfsPrev = testParts->tStampSubPrev - testParts->tStampPubPrev;
         int64_t latPlusClockOfsNow = tLast - testParts->tStampPubNow;
         int64_t transportLatencyAverage = (latPlusClockOfsPrev + latPlusClockOfsNow) / 2;
+#if 0
         fprintf(stderr, "seq,%u,rate,%u,size,%u,B-A,%lld,D-C,%lld,Avg,%lld\n",
             testParts->seqNum,
             testParts->pub_rate,
@@ -84,13 +88,21 @@ public:
             latPlusClockOfsPrev,
             latPlusClockOfsNow,
             transportLatencyAverage);
-
+#endif
         // put into sum/min/max values and update the count
         mTransStats.latSampSum += transportLatencyAverage;
         if (transportLatencyAverage < mTransStats.latMin) mTransStats.latMin = transportLatencyAverage;
         if (transportLatencyAverage > mTransStats.latMax) mTransStats.latMax = transportLatencyAverage;
         mTransStats.latSampCount++;
         mTransStats.dataSizeSum += dataSize;
+        mTransStats.pubIntervalSumNsec += testParts->pub_rate;
+        
+        // check for dropped sample
+        if (mPrevSeqNum != 0) {
+            mTransStats.droppedSamples += (testParts->seqNum - (mPrevSeqNum + 1));
+        }
+        mPrevSeqNum = testParts->seqNum;
+        
 
         // check if interval is finished
         if (tLast > mIntervalEnd)
@@ -99,6 +111,7 @@ public:
             mTransStats.latMean = mTransStats.latSampSum / mTransStats.latSampCount;
             mTransStats.dataSizeMean = mTransStats.dataSizeSum / mTransStats.latSampCount;
             mTransStats.intervalNsec = mIntervalDuration;
+            mTransStats.pubIntervalSumNsec /= mTransStats.latSampCount;
             transportStats.push_back(mTransStats);
             perf_data_ready = true;
             // re-init
@@ -111,34 +124,39 @@ public:
             mTransStats.latMin = 999999999999999;
             mTransStats.latSampCount = 0;
             mTransStats.latSampSum = 0;
+            mTransStats.pubIntervalSumNsec = 0;
+            mPrevSeqNum = 0;
         }
         return (uint8_t)testParts->testMode;
     }
 
     // print_perf_data() -- print stuff
     void print_perf_header(void) {
-        fprintf(stdout, "dataSize,latMin,latMean,latMax,count,dropped,interval_nsec\n");
+        fprintf(stdout, "dataSize,pubRate,latMin,latMean,latMax,count,dropped,pubRateS,dataRatekBS\n");
     }
 
     void print_perf_data(void)
     {
         while (transportStats.size()) {
-            fprintf(stdout, "%lld,%lld,%lld,%lld,%lld,%d,%lld\n",
+            fprintf(stdout, "%lld,%0.1f,%lld,%lld,%lld,%lld,%d,%0.1f,%3.0f\n",
                 transportStats.front().dataSizeMean,
+                1000000000.0 / (double)transportStats.front().pubIntervalSumNsec,
                 transportStats.front().latMin,
                 transportStats.front().latMean,
                 transportStats.front().latMax,
                 transportStats.front().latSampCount,
                 transportStats.front().droppedSamples,
-                transportStats.front().intervalNsec);
+                (double)transportStats.front().intervalNsec / 1000000000.0,
+                (1000000000.0 / (double)transportStats.front().pubIntervalSumNsec) * transportStats.front().dataSizeMean
+            );
             transportStats.erase(transportStats.begin());
         }
         perf_data_ready = false;
     }
 
 private:
-    // new new
     struct transStats mTransStats;          // struct of transport latency stats data
     uint64_t mIntervalDuration;             // duration of the testing/reporting interval
     uint64_t mIntervalEnd;                  // finish time of testing interval
+    uint32_t mPrevSeqNum;                   // sequence number of most-recently-received sample
 };

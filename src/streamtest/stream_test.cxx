@@ -38,7 +38,7 @@ rtiComms* gMyPerfPub = NULL;        // pointer to DDS publisher instance
 std::string gMyNodeId;              // my node ID, in hashed form
 uint64_t gTSubRcv = 0;              // timestamp of most-recent subscriber sample received
 uint64_t gTSPrevLink[2] = { 0 };    // timestamps (pub, sub) of the previous transport in test loop
-bool gForwardOnly = false;          // if true, don't initiate any pub action (other than forwarding rcv'd samples)
+uint32_t gRcvTestMode = 1;          // 0=forward only, 1=ping
 
 // listener class for received test data
 class TestDataReaderListener
@@ -98,9 +98,8 @@ class TestDataReaderListener
                 gTSubRcv = tNow;
 
                 // update the stats for this interval
-                uint8_t myMode = gMyPerfCalc.update_stats(tNow, sample.data().data().data(), (uint32_t)sample.data().data().size());
-                gForwardOnly = (myMode != 0);
-
+                gRcvTestMode = gMyPerfCalc.update_stats(tNow, sample.data().data().data(), (uint32_t)sample.data().data().size());
+                
                 // now either forward or retire the sample
                 if (sample.data().pub_id() != gMyNodeId) {
                     // this sample did not come from me; re-publish it with my timestamps moved to 'prev' positions
@@ -112,6 +111,7 @@ class TestDataReaderListener
                     tNow = tstamp_u64_get();
                     memcpy(tmpSample.data().data() + 32, &tNow, sizeof(uint64_t));
                     gMyPerfPub->publish(tmpSample);
+
                 }
                 else {
                     // this sample came from me; retire it
@@ -155,10 +155,10 @@ void participant_main(application::ApplicationArguments args)
     pubSample.pub_id(gMyNodeId);
 
     // were any sweep parms set in the config file?
-    uint8_t testMode = 0;
+    uint8_t testMode = 1;
     loopCfg innerCfg, outerCfg;
     if (args.loopInnerSteps) {
-        testMode = 1;
+        testMode = 2;
         if (args.loopInnerWhat == "pubsize") innerCfg = loopCfg::LOOP_PUBSIZE;
         else if (args.loopInnerWhat == "pubrate") innerCfg = loopCfg::LOOP_PUBRATE;
         else if (args.loopInnerWhat == "datarate") innerCfg = loopCfg::LOOP_DATARATE;
@@ -181,7 +181,7 @@ void participant_main(application::ApplicationArguments args)
         uint64_t tLoop = tstamp_u64_get();
 
         // check our mode
-        if (testMode == 0)      // ping every 2 seconds
+        if (testMode == 1)      // ping every 2 seconds
         {
             // publish a ping every pingInterval
             if (tLoop >= tNextPingPub) {
@@ -213,8 +213,12 @@ void participant_main(application::ApplicationArguments args)
                 }
                 seqNum++;
             }
+            if (gRcvTestMode == 2) {
+                testMode = 0;
+            }
         }
-        else {
+        else if(testMode == 2) 
+        {
             // run a sweep test of some sort; stay here until complete or timeout
             bool inloop = true;
             bool updateOuter = true;
@@ -242,11 +246,11 @@ void participant_main(application::ApplicationArguments args)
                         // datarate is in bytes per second
                     }
 
-                    outStep++;
-                    if (args.loopOuterSteps) {
+                    if (args.loopOuterSteps > 1) {
                         // FIXME: scale this up to get better integer math rounding
-                        outNow = ((outStep * (args.loopOuterStop - args.loopOuterStart)) / args.loopOuterSteps) + args.loopOuterStart;
+                        outNow = ((outStep * (args.loopOuterStop - args.loopOuterStart)) / (args.loopOuterSteps - 1)) + args.loopOuterStart;
                     }
+                    outStep++;
                     updateOuter = false;
                 }
 
@@ -289,9 +293,12 @@ void participant_main(application::ApplicationArguments args)
 
                     inStep++;
                     if (inStep >= args.loopInnerSteps) {
-                        if (outStep > args.loopOuterSteps) {
-                            // finished with test
+                        if (outStep >= args.loopOuterSteps) {
+                            // finished with test; return to a low-rate ping
                             inloop = false;
+                            testMode = 1;
+                            timeBetweenPubsNs = 2000000000;
+                            pubSample.data().resize(1504);
                         }
                         else {
                             // loop again
@@ -333,6 +340,13 @@ void participant_main(application::ApplicationArguments args)
                     gMyPerfCalc.print_perf_data();
                     updateInner = true;
                 }
+            }
+        }
+        else 
+        {
+            if ((tLoop - gTSubRcv) > 2500000000)
+            {
+                testMode = 1;
             }
         }
 
