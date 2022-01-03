@@ -117,7 +117,7 @@ namespace application {
         std::string this_station_name = "My station default name";    // my station name 
         std::string from_station_name = "From station default name";  // Receive data from this station
         std::string config_filename = config_filename_default;
-        bool is_vid_pub = true;
+        bool is_vid_pub = false;
         bool writeback_config_file = false;
         uint32_t data_sample_size = 1504;
         rti::config::Verbosity verbosity(rti::config::Verbosity::EXCEPTION);
@@ -183,11 +183,6 @@ namespace application {
                 is_vid_pub = true;
                 arg_processing += 1;
             }
-            else if ((strcmp(argv[arg_processing], "-s") == 0
-                || strcmp(argv[arg_processing], "--sub") == 0)) {
-                is_vid_pub = false;
-                arg_processing += 1;
-            }
             else if ((strcmp(argv[arg_processing], "-w") == 0
                 || strcmp(argv[arg_processing], "--writeback") == 0)) {
                 writeback_config_file = true;
@@ -218,8 +213,7 @@ namespace application {
             std::cout << "Usage:\n"\
                 "    -d, --domain      <int>     Domain ID this application will operate in\n" \
                 "                                Default: " << domain_id << "\n"\
-                "    -p, --pub                   Publish (video stream)\n"\
-                "    -s, --sub                   Subscribe (video stream)\n"\
+                "    -p, --pub                   Publish (video stream), else subscribe\n"\
                 "    -m, --me          <string>  ID of this station\n" \
                 "                                Default: " << this_station_name << "\n"\
                 "    -f, --from        <string>  Receive data from this station\n" \

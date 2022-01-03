@@ -36,7 +36,7 @@
 #include <rti/util/util.hpp>        // for sleep() 
 #include "rti_comms.hpp"            // for Connext DDS pub/sub of bulk streaming topic
 #include "murmurhash3.h"            // for hashing
-#include "streamvid/app_helper.hpp"           // for command line args and signals, name hashing
+#include "streamvid/app_helper.hpp" // for command line args and signals, name hashing
 
 // This sets the UDP socket connection between FFMPEG/FFPLAY and this example
 std::string hostname("127.0.0.1");
@@ -155,10 +155,11 @@ void udp_input_thread(void)
         inx += udp_bytes_rcvd;
         if (inx > rollx) rollx = inx;
 
-        // wrap the buffer if either: very close to end, 
-        // or if near the end and a chunk of data < 1472 bytes
-        // was just received, as these tend to result in alignment
-        // with the MPEG-TS packets (which are 188 bytes in length)
+        /* wrap the buffer if either: very close to end, 
+           or if near the end and a chunk of data < 1472 bytes
+           was just received, as these tend to help align the send buffer
+           with the MPEG-TS packets (which are 188 bytes in length)
+        */
         if (((inx > ((7 * tmpBufMax) / 8)) && (udp_bytes_rcvd < 1472))
             || ((inx + 1472) >= tmpBufMax))
         {
