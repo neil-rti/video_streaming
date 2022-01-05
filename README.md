@@ -29,7 +29,7 @@ This will build the example applications for streaming video and measuring its p
 ## 1. Streaming using an external 'ffmpeg' and 'ffplay'
 
 This example uses the `ffmpeg` and `ffplay` video codec and display applications; 
-these must be installed in available in your system PATH.  
+these must be installed and available in your system PATH.  
 For convenience, a launcher script `run_demo` has been provided.  This script will
 launch the 4 applications in separate command terminals to demonstrate video streaming
 on a common PC host. The commands within this script may be used separately to stream 
@@ -39,24 +39,32 @@ To launch with the `run_demo` script:
 
     run_demo
 
+This will open 4 terminals and launch the publisher, subscriber, ffplay, and ffmpeg, streaming video+audio from the 
+include `RTI-vehicles-captioned-480.mp4` file.
+
+
 To launch as separate applications: Two pairs of terminals will be needed: 2 for publish, 2 for subscribe
 
 Publisher terminal 1:
 
-   build/streamvid.exe -p PubMachine
+    build/streamvid.exe -p PubMachine
 
 Publisher terminal 2:
 
-   ffmpeg -re -i RTI-vehicles-captioned-480.mp4 -g 15 -pix_fmt yuv420p -vcodec libx264 -preset ultrafast -tune zerolatency -f mpegts udp://127.0.0.1:2277
+    ffmpeg -re -i RTI-vehicles-captioned-480.mp4 -g 15 -pix_fmt yuv420p -vcodec libx264 -preset ultrafast -tune zerolatency -f mpegts udp://127.0.0.1:2277
 
 Subscriber terminal 1:
 
-   build/streamvid.exe -s PubMachine
+    build/streamvid.exe -s PubMachine
 
 Subscriber terminal 2:
 
-   ffplay -fflags nobuffer -i udp://127.0.0.1:2278
+    ffplay -fflags nobuffer -i udp://127.0.0.1:2278
 
 
+## 2. Notes about Tuning
+
+The included video file `RTI-vehicles-captioned-480.mp4` is a 720p video with a duration of 88 seconds.
+The data rate requirements for this video should accommodate real-time streaming across a WAN network.
 
 EOF.
