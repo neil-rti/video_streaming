@@ -155,20 +155,8 @@ namespace application {
                 arg_processing += 2;
             }
             else if ((argc > arg_processing + 1)
-                && (strcmp(argv[arg_processing], "-m") == 0
-                    || strcmp(argv[arg_processing], "--me") == 0)) {
-                this_station_name = std::string(argv[arg_processing + 1]);
-                arg_processing += 2;
-            }
-            else if ((argc > arg_processing + 1)
-                && (strcmp(argv[arg_processing], "-f") == 0
-                    || strcmp(argv[arg_processing], "--from") == 0)) {
-                from_station_name = std::string(argv[arg_processing + 1]);
-                arg_processing += 2;
-            }
-            else if ((argc > arg_processing + 1)
-                && (strcmp(argv[arg_processing], "-s") == 0
-                    || strcmp(argv[arg_processing], "--size") == 0)) {
+                && (strcmp(argv[arg_processing], "-b") == 0
+                    || strcmp(argv[arg_processing], "--buffer") == 0)) {
                 data_sample_size = atoi(argv[arg_processing + 1]);
                 arg_processing += 2;
             }
@@ -180,8 +168,15 @@ namespace application {
             }
             else if ((strcmp(argv[arg_processing], "-p") == 0
                 || strcmp(argv[arg_processing], "--pub") == 0)) {
+                this_station_name = std::string(argv[arg_processing + 1]);
                 is_vid_pub = true;
-                arg_processing += 1;
+                arg_processing += 2;
+            }
+            else if ((strcmp(argv[arg_processing], "-s") == 0
+                || strcmp(argv[arg_processing], "--sub") == 0)) {
+                from_station_name = std::string(argv[arg_processing + 1]);
+                is_vid_pub = false;
+                arg_processing += 2;
             }
             else if ((strcmp(argv[arg_processing], "-w") == 0
                 || strcmp(argv[arg_processing], "--writeback") == 0)) {
@@ -213,12 +208,9 @@ namespace application {
             std::cout << "Usage:\n"\
                 "    -d, --domain      <int>     Domain ID this application will operate in\n" \
                 "                                Default: " << domain_id << "\n"\
-                "    -p, --pub                   Publish (video stream), else subscribe\n"\
-                "    -m, --me          <string>  ID of this station\n" \
-                "                                Default: " << this_station_name << "\n"\
-                "    -f, --from        <string>  Receive data from this station\n" \
-                "                                Default: " << from_station_name << "\n"\
-                "    -s, --size        <int>     Size of the data portion to be streamed\n"\
+                "    -p, --pub         <string>  Publish (video stream) as this ID\n"\
+                "    -s, --sub         <string>  Subscribe (video stream) from this ID\n"\
+                "    -b, --buffer      <int>     Size of the data buffer (DDS sample size) in bytes\n"\
                 "                                Default: " << data_sample_size << "\n"\
                 "    -c, --configfile  <string>  Configuration filename to load\n"\
                 "                                Default: " << config_filename_default << "\n"\

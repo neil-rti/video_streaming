@@ -183,10 +183,14 @@ void participant_main(application::ApplicationArguments args)
     // convert names to ID strings (used as DDS topic name)
     std::string myId, fromId;
     application::contact_name_to_id(args.this_station_name, myId);
-    fprintf(stderr, "This Station: [%s], '%s'\n", myId.c_str(), args.this_station_name.c_str());
-
     application::contact_name_to_id(args.from_station_name, fromId);
-    if (!(args.is_vid_pub)) fprintf(stderr, "From Station: [%s], '%s'\n", fromId.c_str(), args.from_station_name.c_str());
+
+    if (args.is_vid_pub) {
+        fprintf(stderr, "This Station: %s publishing on topic: '%s'\n", args.this_station_name.c_str(), myId.c_str());
+    }
+    else {
+        fprintf(stderr, "This Station: %s subscribing to topic: '%s'\n", args.this_station_name.c_str(), fromId.c_str());
+    }
 
     // Create a DomainParticipant with default Qos
     dds::domain::DomainParticipant participant(args.domain_id);
