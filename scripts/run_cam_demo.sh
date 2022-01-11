@@ -49,6 +49,7 @@ do
 done
 
 ### Launch all component programs
+### Note: these are examples only; check with the FFMPEG manual for your version and platform for a correct camera-input command line.
 case ${TERM} in
   lxterminal)
     ${TERM} ${GEOMETRY} -t streamvid-pub -e "./build/streamvid -p PubMachine" &
