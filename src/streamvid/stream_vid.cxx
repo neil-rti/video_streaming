@@ -192,6 +192,9 @@ void participant_main(application::ApplicationArguments args)
         fprintf(stderr, "This Station: %s subscribing to topic: '%s'\n", args.this_station_name.c_str(), fromId.c_str());
     }
 
+    // set the default QoS from the args (a, b or c)
+    dds::core::QosProvider::Default()->default_profile(std::string("UserQosProfilesLibrary::profile_" + args.qos_profile));
+
     // Create a DomainParticipant with default Qos
     dds::domain::DomainParticipant participant(args.domain_id);
 

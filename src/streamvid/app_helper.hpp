@@ -57,6 +57,7 @@ namespace application {
         uint32_t data_sample_size;
         std::string from_station_name;
         bool is_vid_pub;
+        std::string qos_profile;
         rti::config::Verbosity verbosity;
 
         ApplicationArguments(
@@ -66,6 +67,7 @@ namespace application {
             uint32_t data_sample_size_param,
             std::string from_station_name_param,
             bool is_vid_pub_param,
+            std::string qos_profile_param,
             rti::config::Verbosity verbosity_param)
             : parse_result(parse_result_param),
             domain_id(domain_id_param),
@@ -73,6 +75,7 @@ namespace application {
             data_sample_size(data_sample_size_param),
             from_station_name(from_station_name_param),
             is_vid_pub(is_vid_pub_param),
+            qos_profile(qos_profile_param),
             verbosity(verbosity_param) {}
     };
 
@@ -114,12 +117,13 @@ namespace application {
         // arg priority is: 1:cmdLine args, 2:args from config file, 3: defaults
         // 3: init with defaults
         unsigned int domain_id = 0;
-        std::string this_station_name = "My station default name";    // my station name 
-        std::string from_station_name = "From station default name";  // Receive data from this station
+        std::string this_station_name = "MyLocalStation";    // my station name 
+        std::string from_station_name = "FarEndStation";     // far-end station name
         std::string config_filename = config_filename_default;
         bool is_vid_pub = false;
         bool writeback_config_file = false;
-        uint32_t data_sample_size = 1504;
+        std::string qos_profile = "b";
+        uint32_t data_sample_size = 1316;
         rti::config::Verbosity verbosity(rti::config::Verbosity::EXCEPTION);
 
         // 2: parms from config file.  Was one specified as cmdline arg?
@@ -138,12 +142,14 @@ namespace application {
         // load properties from file
         PropertyUtil* prop = new PropertyUtil(config_filename);
         domain_id = prop->getIntProperty("config.domainId");
-        data_sample_size = prop->getIntProperty("config.data_sample_size");
-        if(data_sample_size == 0) data_sample_size = 1316;
-        this_station_name = prop->getStringProperty("config.this_station_name");
-        if(this_station_name == "") this_station_name = "ThisStationDefaultName";
-        from_station_name = prop->getStringProperty("config.from_station_name");
-        if(from_station_name == "") from_station_name = "FromStationDefaultName";
+        uint32_t tmp_sample_size = prop->getIntProperty("config.data_sample_size");
+        if(tmp_sample_size != 0) data_sample_size = tmp_sample_size;
+        std::string tmp_str = prop->getStringProperty("config.this_station_name");
+        if(tmp_str != "") this_station_name = tmp_str;
+        tmp_str = prop->getStringProperty("config.from_station_name");
+        if(tmp_str != "") from_station_name = tmp_str;
+        tmp_str = prop->getStringProperty("config.qos_profile");
+        if (tmp_str != "") qos_profile = tmp_str;
 
         // 1: parse the command line args
         arg_processing = 1;
@@ -184,6 +190,12 @@ namespace application {
                 arg_processing += 1;
             }
             else if ((argc > arg_processing + 1)
+                && (strcmp(argv[arg_processing], "-q") == 0
+                    || strcmp(argv[arg_processing], "--qos") == 0)) {
+                qos_profile = std::string(argv[arg_processing + 1]);
+                arg_processing += 2;
+            }
+            else if ((argc > arg_processing + 1)
                 && (strcmp(argv[arg_processing], "-v") == 0
                     || strcmp(argv[arg_processing], "--verbosity") == 0)) {
                 set_verbosity(verbosity, atoi(argv[arg_processing + 1]));
@@ -211,14 +223,17 @@ namespace application {
                 "    -p, --pub         <string>  Publish (video stream) as this ID\n"\
                 "    -s, --sub         <string>  Subscribe (video stream) from this ID\n"\
                 "    -b, --buffer      <int>     Size of the data buffer (DDS sample size) in bytes\n"\
-                "                                Default: " << data_sample_size << "\n"\
+                "                                 Default: " << data_sample_size << "\n"\
                 "    -c, --configfile  <string>  Configuration filename to load\n"\
-                "                                Default: " << config_filename_default << "\n"\
+                "                                 Default: " << config_filename_default << "\n"\
                 "    -w, --writeback             Write-back to the config file, updated args\n"\
                 "                                \n"\
+                "    -q, --qos         <a,b,c>   QoS profile to use: a:reliable, b:best-effort,\n"\
+                "                                 c:user-defined.  All are in USER_QOS_PROFILES.xml\n"\
+                "                                 Default: " << qos_profile << "\n"\
                 "    -v, --verbosity   <int>     How much debugging output to show.\n"\
-                "                                Range: 0-3 \n"\
-                "                                Default: 1 (EXCEPTION)\n"\
+                "                                 Range: 0-3 \n"\
+                "                                 Default: 1 (EXCEPTION)\n"\
                 "    -h, --help                  Print this list and exit\n"\
                 << std::endl;
         }
@@ -230,6 +245,7 @@ namespace application {
             tmpMap["config.domainId"] = std::to_string(domain_id);
             tmpMap["config.from_station_name"] = this_station_name;
             tmpMap["config.this_station_name"] = from_station_name;
+            tmpMap["config.qos_profile"] = qos_profile;
             std::ofstream fout(config_filename);
             if(fout) {
                 for (auto kv : tmpMap) {
@@ -244,7 +260,7 @@ namespace application {
 
         return ApplicationArguments(
             parse_result, domain_id, this_station_name, data_sample_size, from_station_name, 
-            is_vid_pub, verbosity);
+            is_vid_pub, qos_profile, verbosity);
  
     }
 
