@@ -2,7 +2,7 @@
 
 module cctypes {
     // limits on element sizes
-    const uint32 MAX_SEQUENCE_LEN = 188000;
+    const uint32 MAX_SEQUENCE_LEN = 18800000;       // 18.8MB == 100K MPEG-TS 188-byte packets
     const uint8 KEY_STRING_LEN = 8;
 
     // this is the bulk datatype for sending streaming video/audio data

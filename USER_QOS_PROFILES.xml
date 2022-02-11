@@ -72,12 +72,11 @@ XML" chapter in the RTI Connext DDS Core Libraries User's Manual.
           </participant_liveliness_assert_period>
         </discovery_config>
 
-        <!--
         <transport_builtin>
           <mask>UDPv4</mask>
         </transport_builtin>
-        -->
         
+        <!--
         <transport_builtin>
           <mask>UDPv4_WAN</mask>
           <udpv4_wan>
@@ -92,6 +91,7 @@ XML" chapter in the RTI Connext DDS Core Libraries User's Manual.
             <element>rtps@pmdemo.rti.com:8600</element>
           </initial_peers>
         </discovery>
+        -->
         
         <property>
           <value>
@@ -196,12 +196,11 @@ XML" chapter in the RTI Connext DDS Core Libraries User's Manual.
           <role_name>dpQoSbRole</role_name>
         </participant_name>
 
-        <!--
         <transport_builtin>
           <mask>UDPv4</mask>
         </transport_builtin>
-        -->
         
+        <!--
         <transport_builtin>
           <mask>UDPv4_WAN</mask>
         </transport_builtin>
@@ -210,6 +209,7 @@ XML" chapter in the RTI Connext DDS Core Libraries User's Manual.
             <element>rtps@pmdemo.rti.com:8600</element>
           </initial_peers>
         </discovery>
+        -->
         
       </participant_qos>
     </qos_profile>

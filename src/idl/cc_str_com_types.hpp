@@ -10,8 +10,8 @@ For more information, type 'rtiddsgen -help' at a command shell
 or consult the Code Generator User's Manual.
 */
 
-#ifndef cc_str_com_types_357124250_hpp
-#define cc_str_com_types_357124250_hpp
+#ifndef cc_str_com_types_357124301_hpp
+#define cc_str_com_types_357124301_hpp
 
 #include <iosfwd>
 
@@ -59,7 +59,7 @@ or consult the Code Generator User's Manual.
 
 namespace cctypes {
 
-    static const uint32_t MAX_SEQUENCE_LEN = 188000UL;
+    static const uint32_t MAX_SEQUENCE_LEN = 18800000UL;
 
     static const uint8_t KEY_STRING_LEN = 8;
 
@@ -216,5 +216,5 @@ namespace rti {
 #define NDDSUSERDllExport
 #endif
 
-#endif // cc_str_com_types_357124250_hpp
+#endif // cc_str_com_types_357124301_hpp
 

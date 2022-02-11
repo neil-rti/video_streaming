@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.3.2)
-project (cc_wanstream)
+project (cc_streamvid)
 
 if(DEFINED ENV{NDDSHOME})
   set(NDDSHOME $ENV{NDDSHOME})
@@ -31,12 +31,3 @@ add_executable(streamvid
   src/idl/cc_str_com_typesPlugin.cxx)
 target_link_libraries(streamvid PUBLIC RTIConnextDDS::cpp2_api)
 
-# streamtest : performance monitoring of video streaming example
-add_executable(streamtest 
-  src/streamtest/stream_test.cxx
-  src/common/rti_comms.cxx
-  src/common/murmurhash3.cpp
-  src/common/property_util.cxx
-  src/idl/cc_str_com_types.cxx
-  src/idl/cc_str_com_typesPlugin.cxx)
-target_link_libraries(streamtest PUBLIC RTIConnextDDS::cpp2_api)
